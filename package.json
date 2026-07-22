@@ -1,0 +1,26 @@
+{
+  "name": "hybrid-app-template",
+  "version": "1.0.0",
+  "private": true,
+  "description": "基于「原生外壳 + H5」混合架构 App 开发模板",
+  "workspaces": [
+    "h5",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @hybrid/h5",
+    "build": "npm run build --workspace @hybrid/h5",
+    "preview": "npm run preview --workspace @hybrid/h5",
+    "build:offline": "npm run build --workspace @hybrid/offline-packager",
+    "pack:offline": "npm start --workspace @hybrid/offline-packager",
+    "type-check": "npm run type-check --workspaces --if-present",
+    "lint": "echo \"(placeholder) lint\""
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=8"
+  }
+}

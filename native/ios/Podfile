@@ -1,0 +1,11 @@
+platform :ios, '13.0'
+use_frameworks!
+
+target 'HybridApp' do
+  # JSBridge（可选，自研可去掉）
+  pod 'DSBridge-iOS', '~> 3.0'
+  # 离线包解压
+  pod 'SSZipArchive', '~> 2.5'
+  # 网络（可选）
+  pod 'Alamofire', '~> 5.6'
+end

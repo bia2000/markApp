@@ -1,0 +1,43 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# build outputs
+dist
+build
+*.tsbuildinfo
+
+# native build artifacts
+native/ios/build
+native/ios/Pods
+native/ios/DerivedData
+native/android/.gradle
+native/android/build
+native/android/app/build
+native/android/app/release
+native/android/local.properties
+native/android/captures
+
+# offline packages output
+packages/offline-packager/output
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.xcodeproj
+*.xcworkspace
+
+# env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

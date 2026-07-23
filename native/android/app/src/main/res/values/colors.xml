@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主题色 -->
+    <color name="colorPrimary">#1989FA</color>
+    <color name="colorPrimaryDark">#1976D2</color>
+    <color name="colorAccent">#1989FA</color>
+
+    <!-- TabBar 颜色 -->
+    <color name="tabSelected">#1989FA</color>
+    <color name="tabUnselected">#999999</color>
+    <color name="tabBackground">#FFFFFF</color>
+</resources>

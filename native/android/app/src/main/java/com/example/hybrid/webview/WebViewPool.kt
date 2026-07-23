@@ -5,13 +5,14 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.example.hybrid.bridge.JSBridge
 import com.example.hybrid.offline.OfflinePackage
+import java.util.UUID
 
 /**
  * WebView 池：预热 WebView 实例，减少首次打开页面的白屏时间
  */
 object WebViewPool {
 
-    private val pool: ArrayDeque<WebView> = ArrayDeque()
+    private val pool: ArrayDeque<Pair<String, WebView>> = ArrayDeque()
     private const val MAX_SIZE = 3
 
     /**
@@ -19,40 +20,43 @@ object WebViewPool {
      */
     fun preheat(context: Context) {
         repeat(2) {
-            val wv = createWebView(context)
+            val id = UUID.randomUUID().toString()
+            val wv = createWebView(context, id)
             val url = OfflinePackage.entryUrl() ?: "https://app.example.com/index.html"
             wv.loadUrl(url)
-            pool.add(wv)
+            pool.addLast(Pair(id, wv))
         }
     }
 
     /**
      * 从池中取一个预热好的实例；没有则新建
      */
-    fun dequeue(context: Context): WebView {
-        return pool.removeFirstOrNull() ?: createWebView(context)
+    fun dequeue(context: Context): Pair<String, WebView> {
+        return pool.removeFirstOrNull() ?: Pair(UUID.randomUUID().toString(), createWebView(context, UUID.randomUUID().toString()))
     }
 
     /**
      * 用完归还（页面级 WebView 可复用）
      */
-    fun enqueue(webView: WebView) {
+    fun enqueue(id: String, webView: WebView) {
         if (pool.size >= MAX_SIZE) {
+            JSBridge.getInstance().detachWebView(id)
             webView.destroy()
             return
         }
         webView.stopLoading()
         webView.loadUrl("about:blank")
-        pool.add(webView)
+        pool.addLast(Pair(id, webView))
     }
 
-    private fun createWebView(context: Context): WebView {
+    private fun createWebView(context: Context, id: String): WebView {
         return WebView(context).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.useWideViewPort = true
             webViewClient = object : WebViewClient() {}
-            addJavascriptInterface(JSBridge(context), "NativeBridge")
+            addJavascriptInterface(JSBridge.getInstance(), "NativeBridge")
+            JSBridge.getInstance().attachWebView(id, this)
         }
     }
 }

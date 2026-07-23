@@ -1,7 +1,10 @@
 package com.example.hybrid.bridge
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import androidx.fragment.app.Fragment
 import androidx.appcompat.app.AppCompatActivity
 import com.example.hybrid.HybridApp
@@ -25,6 +28,17 @@ import org.json.JSONObject
  *   webView.evaluateJavascript("window.NativeBridge._recvCallback('$json')", null)
  */
 class JSBridge private constructor(private val context: Context) {
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val webViews = mutableMapOf<String, WebView>()
+
+    fun attachWebView(id: String, webView: WebView) {
+        webViews[id] = webView
+    }
+
+    fun detachWebView(id: String) {
+        webViews.remove(id)
+    }
 
     @JavascriptInterface
     fun invoke(payload: String) {
@@ -108,8 +122,11 @@ class JSBridge private constructor(private val context: Context) {
     }
 
     private fun evalJS(js: String) {
-        // 实际项目持有当前 WebView 引用
-        // mainHandler.post { webView.evaluateJavascript(js, null) }
+        mainHandler.post {
+            webViews.values.forEach { webView ->
+                webView.evaluateJavascript(js, null)
+            }
+        }
     }
 
     companion object {
@@ -134,6 +151,8 @@ class JSBridge private constructor(private val context: Context) {
         fun dispatchEvent(event: String, data: Any? = null) {
             instance.dispatchEvent(event, data)
         }
+
+        fun getInstance(): JSBridge = instance
     }
 }
 

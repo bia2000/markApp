@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import com.example.hybrid.R
+import java.util.UUID
 
 /**
  * 页面级容器：通过 bridge.nav.push 启动，承载二级页面 WebView
@@ -24,6 +25,7 @@ class HybridWebActivity : AppCompatActivity() {
     }
 
     private lateinit var webView: android.webkit.WebView
+    private val webViewId = UUID.randomUUID().toString()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,8 +39,11 @@ class HybridWebActivity : AppCompatActivity() {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             webViewClient = com.example.hybrid.offline.OfflinePackageClient()
-            addJavascriptInterface(com.example.hybrid.bridge.JSBridge(this@HybridWebActivity), "NativeBridge")
+            addJavascriptInterface(com.example.hybrid.bridge.JSBridge.getInstance(), "NativeBridge")
         }
+
+        // 注册 WebView
+        com.example.hybrid.bridge.JSBridge.getInstance().attachWebView(webViewId, webView)
 
         title?.let { supportActionBar?.title = it }
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
@@ -53,6 +58,7 @@ class HybridWebActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        com.example.hybrid.bridge.JSBridge.getInstance().detachWebView(webViewId)
         webView.destroy()
         super.onDestroy()
     }

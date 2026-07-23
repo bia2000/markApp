@@ -83,11 +83,15 @@ object OfflinePackage {
         }
     }
 
-    /** 入口 URL：本地离线包 index.html，未命中返回 null */
+    /** 入口 URL：本地离线包 index.html，未命中返回开发服务器地址 */
     fun entryUrl(): String? {
         val entry = File(rootDir, "$currentVersion/index.html")
-        return if (entry.exists()) "file://${entry.absolutePath}" else null
+        // 真机使用电脑局域网 IP，模拟器使用 10.0.2.2
+        return if (entry.exists()) "file://${entry.absolutePath}" else "http://192.168.121.34:5173/"
     }
+
+    /** 获取当前离线包版本 */
+    fun getCurrentVersion(): String = currentVersion
 }
 
 /**
@@ -100,10 +104,7 @@ class OfflinePackageClient : WebViewClient() {
         // 命中离线包：读取本地文件
         if (url.startsWith("https://app.example.com/")) {
             val path = url.substringAfter("https://app.example.com/")
-            val version = OfflinePackage.javaClass.getDeclaredMethod("getCurrentVersion").let {
-                it.isAccessible = true
-                ""
-            }
+            val version = OfflinePackage.getCurrentVersion()
             // 实际项目：从离线包目录读取对应文件
         }
         return null

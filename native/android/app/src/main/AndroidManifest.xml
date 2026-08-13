@@ -9,12 +9,17 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- 钉桌面快捷方式（API < 26 回退广播方式所需，normal 权限，安装即授予） -->
+    <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
+    <!-- MIUI 桌面专用（其现代钉桌 API 落盘时需校验此权限） -->
+    <uses-permission android:name="com.miui.home.permission.INSTALL_SHORTCUT" />
 
     <application
         android:name=".HybridApp"
         android:allowBackup="true"
-        android:icon="@android:drawable/sym_def_app_icon"
-        android:label="HybridApp"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         android:usesCleartextTraffic="true">
@@ -32,5 +37,34 @@
         <activity
             android:name=".shell.HybridWebActivity"
             android:exported="false" />
+
+        <!-- 桌面组件：展示事项列表，点事项即记录一次 -->
+        <!-- exported=true：需接收系统 AppWidgetHost 派发的 APPWIDGET_UPDATE 广播（Android 12+ 强制显式声明） -->
+        <receiver
+            android:name=".widget.TodoWidgetProvider"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/todo_widget_info" />
+        </receiver>
+
+        <!-- 组件列表数据服务（RemoteViews 集合控件要求） -->
+        <service
+            android:name=".widget.TodoWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- 桌面组件点事项记录：原生广播接收器，不拉起 App，直接 +1 并刷新组件 -->
+        <receiver
+            android:name=".widget.WidgetRecordReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.hybrid.action.RECORD_ITEM" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

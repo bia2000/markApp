@@ -1,0 +1,94 @@
+// ========== Toast 主题化（覆盖 Vant 默认黑底） ==========
+// 设计目标：白卡片 + 品牌色小图标圈 + 柔和轻阴影 + 缩放淡入。紧凑简洁。
+//
+// 关键背景：本项目用 @vant/auto-import-resolver 按需引入组件样式，
+// 但 Toast 是「函数式调用」(showToast)，不在模板标签内，所以它的默认
+// CSS（含那个黑底 rgba(0,0,0,.7)）不会被自动打进项目。因此这里的规则
+// 必须自身完整、不依赖 Vant 默认样式即可生效。
+//
+// 关键属性加 !important：即便将来有人改造成引入 Vant 全量样式、或构建
+// 顺序变化，白卡片也能稳定盖过任何来源的默认样式，避免「改了没反应」。
+@use 'variables.scss' as *;
+
+.van-toast.app-toast {
+  // ⚠️ 注意：display 绝不能用 !important！
+  // Vant Toast 基于 Popup，隐藏时给元素加「行内 display:none」(v-show)。
+  // !important 的样式表规则会压过行内样式，导致 toast 永远无法隐藏
+  //（表现为「消失后再次显示、且永不消失」）。其余属性可放心加 !important。
+  display: flex;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 72vw !important;
+  min-height: 0 !important;
+  padding: 12px 16px !important;
+  background: #ffffff !important;
+  color: $color-text !important;
+  font-size: 14px !important;
+  line-height: 1.45 !important;
+  border-radius: $radius-lg !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1) !important;
+
+  // 文案
+  .van-toast__text {
+    margin-top: 8px !important;
+    color: $color-text !important;
+  }
+
+  // 图标圆形底（内联 SVG 渲染成 img，落在品牌色圆里）—— 改小：30px 圈 / 18px 图，更克制
+  .van-toast__icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 50% !important;
+    background: $color-primary !important;
+
+    .van-icon__image {
+      width: 18px !important;
+      height: 18px !important;
+      object-fit: contain !important;
+    }
+  }
+}
+
+// 各类型图标底色
+.van-toast.app-toast--success .van-toast__icon {
+  background: $color-success !important;
+}
+.van-toast.app-toast--error .van-toast__icon {
+  background: $color-danger !important;
+}
+.van-toast.app-toast--warning .van-toast__icon {
+  background: $color-warning !important;
+}
+.van-toast.app-toast--info .van-toast__icon {
+  background: $color-primary !important;
+}
+
+// loading：白卡片上用品牌色转圈
+.van-toast.app-toast--loading {
+  .van-toast__loading {
+    padding: 0 !important;
+    color: $color-primary !important;
+  }
+  .van-toast__text {
+    margin-top: 8px !important;
+    color: $color-text-secondary !important;
+  }
+}
+
+// 入场 / 退场动画：缩放 + 淡入（更轻，scale 0.94）
+.van-toast.app-toast.van-fade-enter-active,
+.van-toast.app-toast.van-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+}
+.van-toast.app-toast.van-fade-enter-from,
+.van-toast.app-toast.van-fade-leave-to {
+  opacity: 0 !important;
+  transform: scale(0.94) translateY(2px) !important;
+}

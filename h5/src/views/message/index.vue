@@ -68,7 +68,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { showToast, showSuccessToast } from "vant";
+import toast from "@/utils/toast";
 import { useMessageStore, type MessageItem } from "@/stores/message";
 
 defineOptions({ name: "message" });
@@ -123,17 +123,17 @@ async function onLoad(): Promise<void> {
 async function onRefresh(): Promise<void> {
   await store.fetchList(true);
   refreshing.value = false;
-  showToast("刷新成功");
+  toast.success("刷新成功");
 }
 
 async function onItemClick(item: MessageItem): Promise<void> {
   if (!item.read) await store.markRead(item.id).catch(() => void 0);
-  showToast(item.title);
+  toast.info(item.title);
 }
 
 async function onMarkAllRead(): Promise<void> {
   await store.markAllRead();
-  showSuccessToast("已全部标记为已读");
+  toast.success("已全部标记为已读");
 }
 
 onMounted(() => {

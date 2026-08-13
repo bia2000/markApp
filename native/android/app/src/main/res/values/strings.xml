@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">记事项</string>
+    <string name="widget_todo_description">记事项：桌面快速记录你的待办事项</string>
+</resources>

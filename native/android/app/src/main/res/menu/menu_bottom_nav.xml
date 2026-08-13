@@ -3,17 +3,17 @@
     <item
         android:id="@+id/tab_home"
         android:icon="@android:drawable/ic_menu_view"
-        android:title="首页" />
+        android:title="记事项" />
     <item
-        android:id="@+id/tab_category"
+        android:id="@+id/tab_stats"
         android:icon="@android:drawable/ic_menu_sort_by_size"
-        android:title="分类" />
+        android:title="统计" />
     <item
-        android:id="@+id/tab_message"
-        android:icon="@android:drawable/ic_dialog_email"
-        android:title="消息" />
+        android:id="@+id/tab_summary"
+        android:icon="@android:drawable/ic_menu_edit"
+        android:title="总结" />
     <item
-        android:id="@+id/tab_profile"
-        android:icon="@android:drawable/ic_menu_my_calendar"
-        android:title="我的" />
+        android:id="@+id/tab_goal"
+        android:icon="@android:drawable/ic_menu_agenda"
+        android:title="每日计划" />
 </menu>

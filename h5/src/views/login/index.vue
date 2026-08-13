@@ -120,7 +120,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { showSuccessToast, showFailToast } from "vant";
+import toast from "@/utils/toast";
 import { useUserStore } from "@/stores/user";
 import { authApi } from "@/api";
 import { navSwitchTab } from "@/bridge/helpers";
@@ -152,12 +152,12 @@ function startCountdown(): void {
 
 async function onSendCode(): Promise<void> {
   if (!/^1\d{10}$/.test(phone.value)) {
-    showFailToast("请输入正确的手机号");
+    toast.error("请输入正确的手机号");
     return;
   }
   try {
     await authApi.sendCode({ phone: phone.value, scene: "login" });
-    showSuccessToast("验证码已发送");
+    toast.success("验证码已发送");
     startCountdown();
   } catch {
     /* request 已统一 toast */
@@ -166,13 +166,13 @@ async function onSendCode(): Promise<void> {
 
 async function onCodeSubmit(): Promise<void> {
   if (!agreed.value) {
-    showFailToast("请先同意协议");
+    toast.warning("请先同意协议");
     return;
   }
   loading.value = true;
   try {
     await userStore.loginByCode(phone.value, code.value);
-    showSuccessToast("登录成功");
+    toast.success("登录成功");
     await navigateAfterLogin();
   } catch {
     /* request 已统一 toast */
@@ -183,13 +183,13 @@ async function onCodeSubmit(): Promise<void> {
 
 async function onPwdSubmit(): Promise<void> {
   if (!agreed.value) {
-    showFailToast("请先同意协议");
+    toast.warning("请先同意协议");
     return;
   }
   loading.value = true;
   try {
     await userStore.loginByPassword(account.value, password.value);
-    showSuccessToast("登录成功");
+    toast.success("登录成功");
     await navigateAfterLogin();
   } catch {
     /* request 已统一 toast */
@@ -213,11 +213,11 @@ async function navigateAfterLogin(): Promise<void> {
 }
 
 function onWechatLogin(): void {
-  showFailToast("微信登录待接入");
+  toast.warning("微信登录待接入");
 }
 
 function onAppleLogin(): void {
-  showFailToast("Apple 登录待接入");
+  toast.warning("Apple 登录待接入");
 }
 </script>
 

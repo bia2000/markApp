@@ -111,7 +111,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { showToast, showConfirmDialog, showSuccessToast } from "vant";
+import confirm from "@/utils/dialog";
+import toast from "@/utils/toast";
 import { useUserStore } from "@/stores/user";
 import { useMessageStore } from "@/stores/message";
 import { navigateTo } from "@/router/navigate";
@@ -148,32 +149,32 @@ function onHeaderClick(): void {
 }
 
 function onOrderClick(key: string): void {
-  showToast(`${key} 订单`);
+  toast.info(`${key} 订单`);
 }
 
 function onMenuClick(key: string): void {
-  showToast("敬请期待");
+  toast.info("敬请期待");
 }
 
 async function onCheckUpdate(): Promise<void> {
   try {
     const res = await checkUpdate();
     if (res.hasUpdate) {
-      showSuccessToast(`发现新版本 ${res.version ?? ""}`);
+      toast.success(`发现新版本 ${res.version ?? ""}`);
     } else {
-      showSuccessToast("已是最新版本");
+      toast.success("已是最新版本");
     }
   } catch {
-    showToast("检查更新失败");
+    toast.error("检查更新失败");
   }
 }
 
 async function onLogout(): Promise<void> {
   try {
-    await showConfirmDialog({ title: "提示", message: "确定退出登录？" });
+    await confirm({ title: "提示", message: "确定退出登录？" });
     await userStore.logout();
     messageStore.$reset();
-    showSuccessToast("已退出");
+    toast.success("已退出");
     router.replace("/home");
   } catch {
     /* 取消 */

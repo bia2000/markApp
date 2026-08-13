@@ -49,11 +49,13 @@ final class HybridWebViewController: UIViewController {
     }
 
     private func loadEntry() {
-        // 优先加载本地离线包入口，fallback 到远程
-        if let url = OfflinePackageHandler.shared.entryURL() {
+        // 优先加载本地离线包入口，fallback 到远程；routePath 以 hash 拼接到 URL，
+        // 保证多 Tab（独立 WebView）与离线包 file:// 场景下路由都能正确命中。
+        let baseStr = OfflinePackageHandler.shared.entryURL()?.absoluteString
+            ?? "https://app.example.com/index.html"
+        let urlStr = "\(baseStr)#\(routePath)"
+        if let url = URL(string: urlStr) {
             webView.load(URLRequest(url: url))
-        } else if let remote = URL(string: "https://app.example.com/index.html") {
-            webView.load(URLRequest(url: remote))
         }
     }
 

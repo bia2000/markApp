@@ -55,7 +55,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { showToast } from "vant";
+import toast from "@/utils/toast";
 import http from "@/utils/request";
 import { navigateBack } from "@/router/navigate";
 
@@ -151,10 +151,10 @@ function onTabChange(): void {
 }
 
 function onDetail(o: OrderItem): void {
-  showToast(`订单 ${o.no}`);
+  toast.info(`订单 ${o.no}`);
 }
 function onPay(o: OrderItem): void {
-  showToast(`支付 ${o.no}`);
+  toast.info(`支付 ${o.no}`);
 }
 </script>
 

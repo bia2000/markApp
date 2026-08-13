@@ -41,7 +41,8 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { showToast, showSuccessToast, showConfirmDialog } from "vant";
+import confirm from "@/utils/dialog";
+import toast from "@/utils/toast";
 import { useUserStore } from "@/stores/user";
 import { navigateBack } from "@/router/navigate";
 import { useRouter } from "vue-router";
@@ -56,27 +57,25 @@ const version = import.meta.env.VITE_APP_VERSION || "1.0.0";
 
 const cacheText = computed(() => `${cacheSize.value.toFixed(1)} MB`);
 
-function onClearCache(): void {
-  showConfirmDialog({
-    title: "提示",
-    message: "确定清除缓存？",
-  })
-    .then(() => {
-      cacheSize.value = 0;
-      showSuccessToast("已清除");
-    })
-    .catch(() => void 0);
+async function onClearCache(): Promise<void> {
+  try {
+    await confirm({ title: "提示", message: "确定清除缓存？" });
+    cacheSize.value = 0;
+    toast.success("已清除");
+  } catch {
+    /* 取消 */
+  }
 }
 
 function onPrivacy(): void {
-  showToast("隐私设置");
+  toast.info("隐私设置");
 }
 
 async function onLogout(): Promise<void> {
   try {
-    await showConfirmDialog({ title: "提示", message: "确定退出登录？" });
+    await confirm({ title: "提示", message: "确定退出登录？" });
     await userStore.logout();
-    showSuccessToast("已退出");
+    toast.success("已退出");
     router.replace("/home");
   } catch {
     /* 取消 */

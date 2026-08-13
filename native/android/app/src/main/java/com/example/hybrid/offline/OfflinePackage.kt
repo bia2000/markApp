@@ -97,7 +97,7 @@ object OfflinePackage {
 /**
  * WebView 资源拦截：命中离线包则返回本地数据
  */
-class OfflinePackageClient : WebViewClient() {
+open class OfflinePackageClient : WebViewClient() {
 
     override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
         val url = request?.url?.toString() ?: return null

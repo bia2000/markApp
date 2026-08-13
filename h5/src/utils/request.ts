@@ -12,7 +12,7 @@ import axios, {
   type AxiosResponse,
   type InternalAxiosRequestConfig
 } from 'axios';
-import { showToast } from 'vant';
+import toast from '@/utils/toast';
 import { storageGet } from '@/bridge/helpers';
 import { eventBus } from '@/bridge/eventbus';
 
@@ -117,7 +117,7 @@ instance.interceptors.response.use(
       eventBus.emit('auth.expired');
     }
     const msg = err.response?.data?.msg || err.message || '网络异常，请稍后重试';
-    showToast(msg);
+    toast.error(msg);
     return Promise.reject(err);
   }
 );

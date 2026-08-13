@@ -53,7 +53,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { showToast } from "vant";
+import toast from "@/utils/toast";
 import { navigateTo } from "@/router/navigate";
 
 defineOptions({ name: "category" });
@@ -121,7 +121,7 @@ const activeCate = ref(0);
 const currentCate = computed(() => categories.value[activeCate.value]);
 
 function onSubClick(s: SubItem): void {
-  navigateTo(s.link).catch(() => showToast("敬请期待"));
+  navigateTo(s.link).catch(() => toast.info("敬请期待"));
 }
 </script>
 

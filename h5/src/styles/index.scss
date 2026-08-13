@@ -1,4 +1,6 @@
 @use 'variables.scss' as *;
+@use 'toast';
+@use 'dialog';
 
 * {
   box-sizing: border-box;

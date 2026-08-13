@@ -10,6 +10,7 @@ import {
   type ScanParams,
   type NavSetRightButtonParams,
   type NavPushParams,
+  type NavSetTabBarParams,
   type PayWechatParams,
   type ShareParams
 } from '@hybrid/bridge-protocol';
@@ -63,6 +64,9 @@ export const navPop = () => call('nav.pop');
 
 /** 切换 Tab */
 export const navSwitchTab = (index: number) => call('nav.switchTab', { index });
+
+/** 向原生注册底部 TabBar（原生外壳渲染，H5 不再自绘） */
+export const setTabBar = (params: NavSetTabBarParams) => call('nav.setTabBar', params);
 
 /** 微信支付 */
 export const payWechat = (params: PayWechatParams) => call('pay.wechat', params);

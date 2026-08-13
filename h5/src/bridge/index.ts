@@ -87,14 +87,30 @@ function mockCall<A extends BridgeAction>(
     case 'nav.push':
     case 'nav.pop':
     case 'nav.switchTab':
+    case 'nav.setTabBar':
     case 'nav.setTitle':
     case 'nav.setBarVisible':
     case 'nav.setRightButton':
     case 'share':
       data = { code: 0 };
       break;
+    case 'shortcut.requestPin':
+      data = { pinned: false };
+      break;
+    case 'shortcut.getPendingQuickAdd':
+      data = { pending: false };
+      break;
+    case 'widget.sync':
+      data = { code: 0 };
+      break;
+    case 'widget.getPendingRecord':
+      data = { pending: null };
+      break;
     case 'app.checkUpdate':
       data = { hasUpdate: false };
+      break;
+    case 'app.ready':
+      data = { code: 0 };
       break;
     default:
       return Promise.resolve({

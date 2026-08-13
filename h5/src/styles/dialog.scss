@@ -1,0 +1,113 @@
+// ========== Dialog 主题化（补齐按需引入缺失的卡片样式） ==========
+// 项目用 @vant/auto-import-resolver 按需引入，但 Dialog 是「函数式调用」
+// (showConfirmDialog)，不在模板标签内，其默认 CSS 不会被自动打进项目。
+// 这里自行提供卡片结构样式；居中 / 遮罩 / 按钮底座由已加载的
+// .van-popup / .van-overlay / .van-button 提供，无需重复。
+//
+// ⚠️ 关键：.van-dialog 同时是 Popup 根元素，显隐由 Popup 的 v-show 控制
+//    （隐藏时加行内 display:none）。因此「根元素」的 display 绝不可加
+//    !important，否则会像 Toast 那样永远无法隐藏。footer / 按钮不在显隐
+//    链路上，可放心用 !important。
+//
+// 危险操作通过 confirm({ danger: true }) 传 className='app-dialog--danger'
+// （根元素加该类），确认按钮变红，强化警示。
+@use 'variables.scss' as *;
+
+.van-dialog {
+  // 卡片自身布局：不加 !important（见上方警告）
+  display: flex;
+  flex-direction: column;
+  // ⚠️ 补足函数式 Dialog 缺失的居中定位
+  // showConfirmDialog 是函数式调用，其依赖的 .van-popup / .van-popup--center
+  // 居中 CSS 不会被按需引入 resolver 打进产物（与 Toast 同坑）。
+  // 原生 .van-dialog 仅靠 top:45%，真正居中由外层 Popup center 提供——
+  // 既然那份 CSS 没来，这里自行用 fixed + transform 居中，否则弹窗会落到
+  // 文档流末尾（页面左下角）。
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2001; // 高于遮罩(.van-overlay z-index:1)，确保浮在遮罩之上
+  width: 320px;
+  max-width: 80vw;
+  padding: 0;
+  background: $color-background-light;
+  border-radius: $radius-lg;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  font-size: $font-md;
+
+  .van-dialog__header {
+    padding: $spacing-lg $spacing-lg $spacing-sm;
+    color: $color-text;
+    font-size: $font-lg;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .van-dialog__content {
+    padding: 0 $spacing-lg;
+  }
+
+  .van-dialog__message {
+    padding: $spacing-sm 0 $spacing-lg;
+    color: $color-text-secondary;
+    font-size: $font-md;
+    line-height: 1.5;
+    text-align: center;
+
+    &--has-title {
+      padding-top: 0;
+    }
+  }
+
+  // 底部按钮栏：两个 van-button 均分，顶部细分割线（不依赖 van-hairline）
+  .van-dialog__footer {
+    display: flex !important;
+    width: 100%;
+    margin-top: $spacing-md;
+    border-top: 1px solid $color-border;
+  }
+
+  .van-dialog__cancel,
+  .van-dialog__confirm {
+    flex: 1;
+    margin: 0;
+    padding: $spacing-md 0;
+    border: none;
+    background: transparent;
+    font-size: $font-md;
+    line-height: 1.2;
+    color: $color-text-secondary !important; // 覆盖 van-button 默认文字色
+    -webkit-tap-highlight-color: transparent;
+
+    &:active {
+      background: rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  .van-dialog__confirm {
+    color: $color-primary !important;
+    font-weight: 600;
+  }
+
+  // 危险操作（删除等）：确认按钮变红，强化警示
+  // 通过 confirm({ danger: true }) 传入 className='app-dialog--danger' 触发
+  &.app-dialog--danger .van-dialog__confirm {
+    color: $color-danger !important;
+  }
+}
+
+// 入场 / 退场动画（轻缩放淡入，呼应 toast 风格）
+.van-dialog-bounce-enter-active,
+.van-dialog-bounce-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+}
+
+.van-dialog-bounce-enter-from,
+.van-dialog-bounce-leave-to {
+  opacity: 0 !important;
+  // 必须与根居中 transform 组合，否则入场/退场会瞬移回左上角
+  transform: translate(-50%, -50%) scale(0.94) !important;
+}

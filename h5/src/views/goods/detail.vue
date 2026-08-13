@@ -52,7 +52,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
-import { showToast } from "vant";
+import toast from "@/utils/toast";
 import http from "@/utils/request";
 import { navigateBack } from "@/router/navigate";
 
@@ -74,16 +74,16 @@ function onBack(): void {
   navigateBack();
 }
 function onContact(): void {
-  showToast("客服");
+  toast.info("客服");
 }
 function onCart(): void {
-  showToast("购物车");
+  toast.info("购物车");
 }
 function onAddCart(): void {
-  showToast("已加入购物车");
+  toast.success("已加入购物车");
 }
 function onBuy(): void {
-  showToast("立即购买");
+  toast.info("立即购买");
 }
 
 onMounted(async () => {

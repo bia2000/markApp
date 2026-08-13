@@ -16,6 +16,9 @@ import com.example.hybrid.bridge.plugins.StoragePlugin
 import com.example.hybrid.bridge.plugins.NavPlugin
 import com.example.hybrid.bridge.plugins.SharePlugin
 import com.example.hybrid.bridge.plugins.AppPlugin
+import com.example.hybrid.bridge.plugins.ShortcutPlugin
+import com.example.hybrid.bridge.plugins.WidgetPlugin
+import com.example.hybrid.bridge.plugins.AppReadyPlugin
 import org.json.JSONObject
 
 /**
@@ -31,6 +34,13 @@ class JSBridge private constructor(private val context: Context) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val webViews = mutableMapOf<String, WebView>()
+
+    /** H5 是否已挂载事件监听器（由 H5 调 app.ready 置位，访问受 eventLock 保护） */
+    private var h5Ready = false
+
+    /** H5 未就绪时排队的事件（event, data），待 markH5Ready 后冲刷 */
+    private val pendingEvents = mutableListOf<Pair<String, Any?>>()
+    private val eventLock = Any()
 
     fun attachWebView(id: String, webView: WebView) {
         webViews[id] = webView
@@ -109,8 +119,37 @@ class JSBridge private constructor(private val context: Context) {
         evalJS(js)
     }
 
-    /** 原生派发事件到 H5 */
-    fun dispatchEvent(event: String, data: Any?) {
+    /**
+     * 原生派发事件到 H5。
+     * - H5 已就绪：立即派发，返回 true。
+     * - H5 未就绪（冷启动 / 白屏期）：排队，待 markH5Ready 后冲刷，返回 false。
+     * 这样事件既不丢失，也不会因「WebView 实例在但 H5 监听未挂载」被 JS 端短路丢弃。
+     */
+    fun dispatchEvent(event: String, data: Any?): Boolean {
+        synchronized(eventLock) {
+            if (h5Ready) {
+                evalEventJS(event, data)
+                return true
+            }
+            pendingEvents.add(event to data)
+        }
+        return false
+    }
+
+    /** H5 通知原生其已就绪（事件监听器已挂载），冲刷此前排队的事件 */
+    fun markH5Ready() {
+        val queue: List<Pair<String, Any?>>
+        synchronized(eventLock) {
+            h5Ready = true
+            queue = pendingEvents.toList()
+            pendingEvents.clear()
+        }
+        for ((event, data) in queue) {
+            evalEventJS(event, data)
+        }
+    }
+
+    private fun evalEventJS(event: String, data: Any?) {
         val json = JSONObject().apply {
             put("msgType", "event")
             put("event", event)
@@ -142,14 +181,22 @@ class JSBridge private constructor(private val context: Context) {
             register(NavPlugin(context.applicationContext))
             register(SharePlugin(context.applicationContext))
             register(AppPlugin(context.applicationContext))
+            register(ShortcutPlugin(context.applicationContext))
+            register(WidgetPlugin(context.applicationContext))
+            register(AppReadyPlugin())
         }
 
         fun register(plugin: BridgePlugin) {
             plugins[plugin.namespace] = plugin
         }
 
-        fun dispatchEvent(event: String, data: Any? = null) {
-            instance.dispatchEvent(event, data)
+        fun dispatchEvent(event: String, data: Any? = null): Boolean {
+            return instance.dispatchEvent(event, data)
+        }
+
+        /** H5 就绪握手：收到 app.ready 后冲刷排队的事件 */
+        fun markH5Ready() {
+            instance.markH5Ready()
         }
 
         fun getInstance(): JSBridge = instance

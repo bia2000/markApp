@@ -1,13 +1,14 @@
 /**
- * H5 业务路由配置
+ * 记事本路由：三个底部 Tab —— 记事项 / 统计 / 总结
  *
- * 双栈协同原则：
- * - 页面级跳转（route.meta.native === true）走 bridge.call('nav.push')，由原生创建/复用 WebView
- * - 页面内跳转走 router.push，由 H5 自身管理
- * - 默认 tab 页面（首页/分类/消息/我的）使用原生 TabBar，H5 不再渲染底部 tab
+ * 底部 TabBar 由原生外壳渲染（方案：根容器为原生 TabBar，每个 Tab 承载一个 WebView）。
+ * H5 在 main.ts 启动时会通过 bridge.nav.setTabBar 把本文件的 tab 配置注册给原生壳，
+ * 原生按 route 加载对应页面；原生壳点击 Tab 切换时由原生驱动（无需 H5 自绘）。
+ * 浏览器预览无原生壳，App.vue 会降级渲染一个 Vant TabBar 以便切换。
  */
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router';
 import { setNavTitle } from '@/bridge/helpers';
+import toast from '@/utils/toast';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -18,76 +19,44 @@ const routes: RouteRecordRaw[] = [
     path: '/home',
     name: 'home',
     component: () => import('@/views/home/index.vue'),
-    meta: { title: '首页', tab: true, tabIndex: 0 }
+    meta: { title: '记事项', tab: true, tabIndex: 0 }
   },
   {
-    path: '/category',
-    name: 'category',
-    component: () => import('@/views/category/index.vue'),
-    meta: { title: '分类', tab: true, tabIndex: 1 }
+    path: '/stats',
+    name: 'stats',
+    component: () => import('@/views/stats/index.vue'),
+    meta: { title: '统计', tab: true, tabIndex: 1 }
   },
   {
-    path: '/message',
-    name: 'message',
-    component: () => import('@/views/message/index.vue'),
-    meta: { title: '消息', tab: true, tabIndex: 2 }
+    path: '/summary',
+    name: 'summary',
+    component: () => import('@/views/summary/index.vue'),
+    meta: { title: '总结', tab: true, tabIndex: 2 }
   },
   {
-    path: '/profile',
-    name: 'profile',
-    component: () => import('@/views/profile/index.vue'),
-    meta: { title: '我的', tab: true, tabIndex: 3 }
-  },
-  {
-    path: '/login',
-    name: 'login',
-    component: () => import('@/views/login/index.vue'),
-    meta: { title: '登录', native: true, hideTabBar: true }
-  },
-  // 页面级路由示例：原生 push 加载
-  {
-    path: '/goods/:id',
-    name: 'goods-detail',
-    component: () => import('@/views/goods/detail.vue'),
-    meta: { title: '商品详情', native: true, hideTabBar: true }
-  },
-  {
-    path: '/order/list',
-    name: 'order-list',
-    component: () => import('@/views/order/list.vue'),
-    meta: { title: '我的订单', native: true, hideTabBar: true }
-  },
-  {
-    path: '/settings',
-    name: 'settings',
-    component: () => import('@/views/settings/index.vue'),
-    meta: { title: '设置', native: true, hideTabBar: true }
+    path: '/daily-goal',
+    name: 'dailyGoal',
+    component: () => import('@/views/dailyGoal/index.vue'),
+    meta: { title: '每日计划', tab: true, tabIndex: 3 }
   }
 ];
 
 const router = createRouter({
-  // WebView 内运行使用 hash 模式更稳定，避免原生容器 history 拦截差异
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes
 });
 
-// 路由守卫：未登录访问受保护页面 → 跳转登录
-router.beforeEach((to, _from, next) => {
-  const token = sessionStorage.getItem('h5_auth_token');
-  const whiteList = ['/login', '/home', '/category'];
-  if (!token && !whiteList.includes(to.path)) {
-    next({ path: '/login', query: { redirect: to.fullPath } });
-  } else {
-    next();
-  }
+// 记事本无需登录，直接进入
+router.beforeEach((_to, _from, next) => {
+  next();
 });
 
-// 路由后置：同步导航栏标题到原生
+// 同步导航栏标题（原生外壳可感知）
 router.afterEach((to) => {
-  const title = (to.meta.title as string) || '';
-  if (title) {
-    setNavTitle(title).catch(() => void 0);
-  }
+  const title = to.meta.title as string | undefined;
+  if (title) setNavTitle(title).catch(() => void 0);
+  // 切页时清理残留 toast（混合架构 WebView 内切页场景补充保险）
+  toast.clear();
 });
 
 export default router;

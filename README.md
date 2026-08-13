@@ -1,646 +1,252 @@
-# 混合架构 App 开发模板
+# markApp —— 原生外壳 + H5 混合架构（目标打卡 · 每日复盘）
 
-> 基于「原生外壳 + H5」三层架构的企业级移动应用开发模板
+一个「原生 App 外壳 + H5 离线包」混合架构的移动应用：**一套 H5 代码同时跑在 iOS / Android 原生 WebView 里**，原生能力（相机、定位、扫码、录音、导航、桌面组件等）以 JSBridge 插件化方式扩展到 H5。H5 业务热更新可绕过应用商店审核，原生壳一次性建设、长期复用。
 
-## 一、项目概述
+> 完整技术方案见仓库内 [`混合架构App开发模板方案.md`](混合架构App开发模板方案.md)。
 
-### 1.1 设计目标
+---
 
-提供一套**可直接落地、可复用**的混合 App 开发模板，让业务团队聚焦 H5 业务页面开发，原生外壳一次性建设、长期复用。
+## 一、技术栈
 
-**核心特性**：
-- **一套 H5，双端运行**：iOS / Android 共用同一套 H5 业务代码
-- **原生级体验**：WebView 预加载 + 离线包 + 原生导航容器
-- **能力可扩展**：原生能力以插件化方式注册到 JSBridge
-- **工程标准化**：内置登录、首页、个人中心、消息中心等基础模块
+| 层 | 技术 |
+|----|------|
+| H5 业务 | Vue 3 + Vite + TypeScript + Pinia + Vue Router + Vant 4 |
+| iOS 外壳 | Swift + `WKWebView`（WebView 池化预热） |
+| Android 外壳 | Kotlin + `WebView`（预置离线包） |
+| 工程化 | npm workspaces 单仓多包（H5 + 共享 packages） |
+| 离线包 | Android：打包进 APK `assets/offline`；iOS：运行时从服务端按版本比对下发 |
 
-### 1.2 适用场景
+---
 
-- 业务迭代频繁、需要快速发版（H5 可热更新，绕过应用商店审核）
-- 已有大量 Web 端资产，希望低成本迁移到 App
-- 多业务线共用一个 App 壳，各业务线独立开发 H5
-- 对部分页面有原生体验要求（如相机、地图、首屏闪屏），其余页面用 H5
-
-### 1.3 技术架构
+## 二、仓库结构（monorepo）
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  原生外壳层 (Native Shell)                               │
-│  iOS: WKWebView(Swift)  ·  Android: WebView(Kotlin)     │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐    │
-│  │ 应用生命  │ │ 导航容器  │ │WebView池 │ │ 原生能力  │    │
-│  │ 周期管理  │ │TabBar/Nav│ │ 预创建复用│ │相机/定位等│    │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘    │
-└───────────────────────┬─────────────────────────────────┘
-                        │ 双向通信 (JSBridge)
-┌───────────────────────┴─────────────────────────────────┐
-│  JSBridge 桥接层                                         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐    │
-│  │ 通信协议  │ │同步/异步 │ │ 事件总线  │ │ 离线包    │    │
-│  │          │ │  调用    │ │          │ │  管理     │    │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘    │
-└───────────────────────┬─────────────────────────────────┘
-                        │ 桥接调用
-┌───────────────────────┴─────────────────────────────────┐
-│  H5 业务层 (Vue3 + Vite + Pinia + Vue Router)           │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐    │
-│  │ 路由管理  │ │网络请求  │ │ 状态管理  │ │ UI组件库  │    │
-│  ├──────────┤ ├──────────┤ ├──────────┤ ├──────────┤    │
-│  │ 登录注册  │ │ 首页框架  │ │ 个人中心  │ │ 消息中心  │    │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘    │
-└─────────────────────────────────────────────────────────┘
+markApp/
+├── .env                          # 全局环境配置（H5 / 离线包 / JSBridge）
+├── package.json                  # 根：npm workspaces，提供 dev/build 等脚本
+├── pnpm-workspace.yaml
+│
+├── h5/                           # H5 业务层（@hybrid/h5）
+│   ├── src/
+│   │   ├── api/                  # 后端接口定义
+│   │   ├── bridge/               # JSBridge H5 侧封装（call / 事件总线 / mock 降级）
+│   │   ├── components/           # 公共组件
+│   │   ├── composables/          # 组合式函数
+│   │   │   ├── useApp.ts         # 平台识别、原生就绪握手
+│   │   │   ├── useWidget.ts      # 桌面组件数据同步
+│   │   │   └── useAudioRecorder.ts  # 语音复盘录音（原生桥 / 浏览器 MediaRecorder 双适配）
+│   │   ├── router/               # 路由 + 双栈协同跳转（navigate.ts / index.ts）
+│   │   ├── stores/               # Pinia：app / user / message / todo / goal / summary
+│   │   ├── styles/               # 全局样式（含 dialog.scss 居中兜底）
+│   │   ├── utils/                # 工具：request(http) / idb / toast / dialog
+│   │   ├── views/                # 业务页面（见第三节）
+│   │   ├── App.vue               # 根组件（含浏览器降级 TabBar）
+│   │   └── main.ts               # 入口（挂载 Bridge 回传入口、初始化 store）
+│   └── package.json
+│
+├── native/                       # 原生外壳层
+│   ├── android/                  # Kotlin：JSBridge + plugins + 离线包(assets/offline)
+│   └── ios/                      # Swift：WKWebView + Bridge/Plugins + Offline
+│
+└── packages/                     # 共享包
+    ├── bridge-protocol/          # @hybrid/bridge-protocol：双端共享的 action 类型契约
+    └── offline-packager/         # @hybrid/offline-packager：离线包打包（manifest + zip）
 ```
 
 ---
 
-## 二、环境要求
+## 三、H5 业务模块
 
-### 2.1 基础环境
+| 页面（views） | 路由 | 说明 |
+|------|------|------|
+| `home` | `/` | 首页入口 |
+| `summary` | `/summary` | **每日总结**：文字复盘 + 语音复盘（录音走原生桥，回放 + 删除） |
+| `dailyGoal` | `/daily-goal` | 每日目标设定与打卡 |
+| `todo` | （store） | 事项账本，桌面组件与「快速记一笔」共享 |
+| `stats` | `/stats` | 数据 / 打卡统计 |
+| `category` | `/category` | 分类导航 |
+| `message` | `/message` | 消息中心 |
+| `profile` | `/profile` | 个人中心 |
+| `settings` | `/settings` | 设置 |
+| `login` | `/login` | 登录 |
 
-| 工具 | 版本要求 | 说明 |
-|------|---------|------|
-| Node.js | ≥ 18.0.0 | 推荐使用 LTS 版本 |
-| npm | ≥ 9.0.0 | 包管理器（已适配 npm workspaces） |
-| Git | ≥ 2.0.0 | 版本控制 |
-
-### 2.2 原生开发环境（可选）
-
-**iOS 开发**：
-- macOS 12.0+
-- Xcode 14.0+
-- CocoaPods 1.12+
-- iOS 模拟器或真机（iOS 13.0+）
-
-**Android 开发**：
-- Android Studio 2022.1+
-- Android SDK（API 24+）
-- Android 模拟器或真机（Android 7.0+）
-
-### 2.3 开发工具推荐
-
-- **IDE**：VS Code + Volar 插件（H5 开发）、Android Studio（Android 原生）、Xcode（iOS 原生）
-- **浏览器**：Chrome 100+（支持最新 JavaScript 特性）
+**语音复盘（重点）**：`/summary` 页支持「文字 / 语音」分段切换。语音录音在**真机走原生桥**（`device.audio.start/stop`，原生录 m4a 回传 base64），浏览器 `localhost` 开发环境走 `MediaRecorder` 双适配。音频 base64 存入 **IndexedDB**（`utils/idb.ts`），store 仅保存按日期的小索引（meta 不含 base64），避免 localStorage 5MB 被撑爆。
 
 ---
 
-## 三、安装步骤
+## 四、架构与关键约定（混合架构必读）
 
-### 3.1 克隆项目
+1. **离线包双端机制不同**
+   - **Android**：离线包预置在 `native/android/app/src/main/assets/offline/`，打进 APK。改完 H5 必须 `npm run build` → 把 `h5/dist` 整体拷进该目录 → Android Studio 重打 APK。WebView 加载 `file:///android_asset/offline`。
+   - **iOS**：离线包在沙盒 `Documents/offline/<version>/`，运行时从 `OFFLINE_MANIFEST_URL` 按版本比对下发。本地改完走 `npm run build:offline` + `npm run pack:offline` 出包上传服务端，真机版本比对后下载。
 
-```bash
-git clone <repository-url>
-cd nativeApp-demo
-```
+2. **JSBridge 三消息模型**（统一在 `packages/bridge-protocol` 定义，双端共享）
+   - `invoke`：H5 调原生，`call(action, params)` 返回 Promise，按 `callbackId` 匹配回传。
+   - `callback`：原生回传结果，H5 在 `main.ts` 挂载 `window.NativeBridge._recvCallback` 接收。
+   - `event`：原生主动派发（如 `app.foreground` / `quick_add`），H5 用 `on(event, fn)` 订阅。
+   - **浏览器降级**：无原生注入时，`call()` 自动走 `mockCall`，便于纯 Web 调试（如 `device.getPlatform` 返回 `web`）。
 
-### 3.2 安装依赖
+3. **原生 Tab vs 浏览器降级 TabBar**
+   - 真机：底部 TabBar 由原生壳渲染，每个 Tab = 一个常驻 WebView（iOS 用 WebView 池）。
+   - 浏览器（无原生）：`App.vue` 渲染降级 `van-tabbar`，单页面内切换路由。
 
-```bash
-# 安装所有工作区依赖（H5 + packages）
-npm install
-```
-
-**依赖说明**：
-- 项目使用 npm workspaces 管理多包依赖
-- 根目录 [.env](.env) 包含所有环境配置
-- 依赖安装后会在根目录生成 `node_modules`
-
-### 3.3 配置环境变量
-
-编辑根目录 [.env](.env) 文件：
-
-```env
-# 应用版本号（与离线包版本一致）
-APP_VERSION=1.0.0
-
-# 运行环境：development | staging | production
-NODE_ENV=development
-
-# H5 开发服务器端口
-H5_DEV_PORT=5173
-
-# 远程入口（离线包未命中时的兜底地址）
-H5_REMOTE_ENTRY=https://app.example.com/index.html
-
-# API 基础地址
-VITE_API_BASE_URL=https://api.example.com
-
-# 网络请求超时（毫秒）
-VITE_API_TIMEOUT=15000
-
-# 请求重试次数
-VITE_API_RETRY=1
-
-# 离线包配置
-OFFLINE_MANIFEST_URL=https://app.example.com/offline/manifest.json
-OFFLINE_DOWNLOAD_BASE=https://app.example.com/offline/packages/
-
-# JSBridge 配置
-BRIDGE_GLOBAL_NAME=NativeBridge
-BRIDGE_DEBUG=true
-
-# 安全配置
-BRIDGE_DOMAIN_WHITELIST=app.example.com,localhost,127.0.0.1
-```
+4. **存储分层**
+   - 小数据 / 索引：`localStorage`（如按日期的总结文字、语音 meta 列表）。
+   - 大二进制（音频 base64）：`IndexedDB`（`utils/idb.ts`，库名 `notepad` / store `audios`）。
 
 ---
 
-## 四、启动运行说明
+## 五、JSBridge 能力清单
 
-### 4.1 开发环境启动
+类型契约见 `packages/bridge-protocol/src/index.ts`。下表为**已落地**的原生实现：
 
-**启动 H5 开发服务器**：
+| 命名空间 | Action | 功能 | 平台 |
+|---------|--------|------|------|
+| `device` | `getPlatform` / `getDeviceId` | 平台信息 / 设备号 | 双端 |
+| `device.camera` | `takePhoto` | 拍照 / 选图 | 双端 |
+| `device.audio` | `start` / `stop` | 录音（回传 base64 + 时长 + 格式） | 双端 |
+| `device.location` | `get` | 获取定位 | 双端 |
+| `device.scan` | `scanCode` | 扫码 | 双端 |
+| `storage.local` | `set` / `get` | 原生本地存储（跨 WebView 共享） | 双端 |
+| `nav` | `setTitle` / `setBarVisible` / `setRightButton` / `push` / `pop` / `switchTab` / `setTabBar` | 导航栏与转场 | 双端 |
+| `share` | （默认） | 分享 | 双端 |
+| `app` | `checkUpdate` / `ready` | 版本检查 / H5 就绪握手 | 双端 |
+| `shortcut` | `requestPin` / `getPendingQuickAdd` | 桌面「快速记一笔」快捷方式 | Android |
+| `widget` | `sync` / `getPendingRecord` / `addRecord` / `removeRecords` / `removeRecord` | 桌面组件数据同步与共享账本 | Android |
+| `push` / `pay` | `register` / `wechat` | 推送 / 微信支付 | 协议已定义，原生侧待接入 |
 
-```bash
-# 方式一：通过根目录脚本启动
-npm run dev
+> `push.register` / `pay.wechat` 已在协议层定义类型，但当前原生 plugin 未实现，调用会走 mock 返回。
 
-# 方式二：直接启动 H5 工作区
-npm run dev --workspace @hybrid/h5
-```
-
-**访问地址**：
-- Local: `http://localhost:5173/`
-- Network: `http://<your-ip>:5173/`
-
-**参数说明**：
-- 端口由 `.env` 中的 `H5_DEV_PORT` 控制
-- 支持热模块替换（HMR）
-- 自动打开浏览器预览
-
-**绕过登录验证**（开发预览用）：
-
-在浏览器控制台执行：
-```javascript
-sessionStorage.setItem('h5_auth_token', 'preview-token')
-```
-
-### 4.2 生产环境启动
-
-**预览构建产物**：
-
-```bash
-# 构建生产包
-npm run build
-
-# 预览构建结果
-npm run preview
-```
-
-### 4.3 原生 App 运行（需原生环境）
-
-**iOS**：
-```bash
-cd native/ios
-pod install
-# 使用 Xcode 打开 HybridApp.xcworkspace 并运行
-```
-
-**Android**：
-```bash
-# 使用 Android Studio 打开 native/android 并运行
-```
-
-### 4.4 常见启动问题
-
-| 问题 | 原因 | 解决方案 |
-|------|------|---------|
-| 端口被占用 | 5173 端口已被使用 | 修改 `.env` 中的 `H5_DEV_PORT` |
-| 依赖安装失败 | npm 缓存问题 | 执行 `npm cache clean --force` 后重试 |
-| 类型检查错误 | TypeScript 版本不匹配 | 确保 Node.js ≥ 18，重新安装依赖 |
-| API 请求失败 | 后端服务未启动 | mock 数据已兜底，不影响页面展示 |
-
----
-
-## 五、打包部署指南
-
-### 5.1 H5 打包
-
-**构建命令**：
-
-```bash
-# 类型检查 + 构建
-npm run build
-```
-
-**构建产物**：
-
-- 输出目录：`h5/dist/`
-- 主要文件：
-  - `index.html` — 入口 HTML
-  - `assets/*.js` — JavaScript 模块（代码分割）
-  - `assets/*.css` — 样式文件
-
-**构建优化**：
-
-- 代码分割：`vue` + `vant` 单独打包
-- Tree Shaking：移除未使用代码
-- 压缩：esbuild 压缩 JS/CSS
-- 首屏体积：gzip ≈ 97KB（符合 <150KB 要求）
-
-### 5.2 离线包打包
-
-**生成离线包**：
-
-```bash
-# 构建离线包工具
-npm run build:offline
-
-# 打包 H5 资源为 zip
-npm run pack:offline
-```
-
-**参数配置**：
-
-```bash
-# 自定义参数（可选）
-npx tsx packages/offline-packager/src/cli.ts \
-  --version 1.0.0 \
-  --src h5/dist \
-  --output ./offline-packages \
-  --package-base https://app.example.com/offline/packages/
-```
-
-**离线包结构**：
-
-```
-offline-packages/
-  v1.0.0/
-    ├── manifest.json      # 版本清单
-    └── package.zip        # H5 资源压缩包
-```
-
-### 5.3 部署流程
-
-**H5 部署**：
-
-1. 构建生产包：`npm run build`
-2. 上传 `h5/dist/` 到 CDN 或静态服务器
-3. 配置 Nginx/Apache 支持 SPA 路由
-
-**离线包部署**：
-
-1. 打包离线包：`npm run pack:offline`
-2. 上传到离线包服务器
-3. 更新 `manifest.json` 版本号
-
-**原生 App 发布**：
-
-- iOS：通过 Xcode Archive 上传到 App Store Connect
-- Android：生成签名 APK/AAB 上传到 Google Play
-
----
-
-## 六、项目主要模块功能说明
-
-### 6.1 核心模块架构
-
-```
-H5 业务层
-├── 路由管理 (router/)
-│   ├── 双栈协同路由
-│   ├── 路由守卫
-│   └── 导航同步
-├── 网络请求 (utils/request)
-│   ├── Axios 封装
-│   ├── Token 注入
-│   ├── 请求去重
-│   └── 错误重试
-├── 状态管理 (stores/)
-│   ├── user — 用户登录态
-│   ├── app — 应用状态
-│   └── message — 消息管理
-├── 业务页面 (views/)
-│   ├── home — 首页
-│   ├── login — 登录注册
-│   ├── profile — 个人中心
-│   ├── message — 消息中心
-│   ├── category — 分类导航
-│   ├── goods — 商品详情
-│   ├── order — 订单列表
-│   └── settings — 设置
-└── 原生桥接 (bridge/)
-    ├── JSBridge 封装
-    ├── 事件总线
-    └── 业务快捷方法
-```
-
-### 6.2 JSBridge 模块
-
-**支持的原生能力**（17 个 action）：
-
-| 命名空间 | Action | 功能 |
-|---------|--------|------|
-| `device.camera` | `takePhoto` | 拍照 |
-| `device.location` | `getCurrentPosition` | 获取定位 |
-| `device.scan` | `scanQRCode` | 扫码 |
-| `storage.local` | `get` / `set` / `remove` | 本地存储 |
-| `push` | `register` / `unregister` | 推送通知 |
-| `pay` | `wechat` / `alipay` | 支付 |
-| `share` | `wechat` / `weibo` | 分享 |
-| `nav` | `push` / `pop` / `switchTab` | 导航控制 |
-| `app` | `checkUpdate` / `exit` | 应用控制 |
-| `auth` | `getAuthCode` | 授权登录 |
-
-**使用示例**：
+**H5 调用示例**
 
 ```typescript
-import { call } from '@/bridge'
+import { call, on } from '@/bridge'
 
-// 拍照
-const photo = await call('device.camera.takePhoto', { quality: 0.8 })
+// 调原生能力（Promise）
+const loc = await call('device.location.get', { type: 'gcj02' })
+await call('nav.setTitle', { title: '每日总结' })
 
-// 获取定位
-const location = await call('device.location.getCurrentPosition')
-
-// 设置导航栏标题
-await call('nav.setTitle', { title: '商品详情' })
-
-// 事件监听
-import { eventBus } from '@/bridge'
-eventBus.on('app.resume', () => {
+// 订阅原生事件
+on('app.foreground', () => {
   console.log('App 回到前台')
 })
 ```
 
-### 6.3 网络请求模块
-
-**特性**：
-
-- Token 自动注入（从原生 storage.local 拉取）
-- 401 自动触发重新登录
-- 请求去重（相同 URL + 参数合并）
-- 网络错误自动重试（默认 1 次）
-- 统一错误处理
-
-**使用示例**：
+**网络请求示例**
 
 ```typescript
 import http from '@/utils/request'
 
-// GET 请求
-const data = await http.get('/goods/123')
-
-// POST 请求
-const result = await http.post('/auth/login', {
-  phone: '13800138000',
-  code: '123456'
-})
-
-// 静默请求（不显示错误 toast）
-const data = await http.get('/user/info', {}, { silent: true })
+const info = await http.get('/user/info')
+const res = await http.post('/auth/login', { phone: '13800138000', code: '123456' })
 ```
 
-### 6.4 路由管理模块
-
-**双栈协同路由**：
-
-- **页面级跳转**（`meta.native: true`）：走 `bridge.nav.push`，由原生创建新 WebView
-- **页面内跳转**：走 `router.push`，由 H5 自身管理
-
-**导航方法**：
+**双栈协同跳转**
 
 ```typescript
 import { navigateTo, navigateBack } from '@/router/navigate'
 
-// 页面级跳转（原生创建 WebView）
-await navigateTo('/goods/123')
-
-// 页面内跳转（H5 路由）
-await navigateTo('/settings')
-
-// 返回
-await navigateBack()
+// meta.native === true 的页面走原生 WebView 转场；其余 H5 内部路由
+await navigateTo('/summary')
+navigateBack()
 ```
 
 ---
 
-## 七、项目目录结构说明
+## 六、新增一个原生能力（标准化步骤）
 
-```
-nativeApp-demo/
-├── .env                          # 全局环境配置
-├── .gitignore                    # Git 忽略规则
-├── .npmrc                        # npm 配置
-├── package.json                  # 根项目配置
-├── pnpm-workspace.yaml           # pnpm workspaces 配置
-├── README.md                     # 项目文档
-│
-├── h5/                           # H5 业务层
-│   ├── dist/                     # 构建产物
-│   ├── src/
-│   │   ├── api/                  # API 接口定义
-│   │   ├── bridge/               # JSBridge 封装
-│   │   ├── components/           # 公共组件
-│   │   ├── composables/          # 组合式函数
-│   │   ├── layouts/              # 布局组件
-│   │   ├── router/               # 路由配置
-│   │   ├── stores/               # 状态管理
-│   │   ├── styles/               # 全局样式
-│   │   ├── utils/                # 工具函数
-│   │   ├── views/                # 业务页面
-│   │   ├── App.vue               # 根组件
-│   │   └── main.ts               # 入口文件
-│   ├── index.html                # HTML 模板
-│   ├── package.json              # H5 依赖配置
-│   ├── tsconfig.json             # TypeScript 配置
-│   └── vite.config.ts            # Vite 配置
-│
-├── native/                       # 原生外壳层
-│   ├── android/                  # Android 原生项目
-│   │   ├── app/
-│   │   │   ├── src/main/
-│   │   │   │   ├── java/         # Kotlin 源码
-│   │   │   │   ├── res/          # 资源文件
-│   │   │   │   └── AndroidManifest.xml
-│   │   │   └── build.gradle.kts
-│   │   └── build.gradle.kts
-│   │
-│   └── ios/                      # iOS 原生项目
-│       ├── HybridApp/
-│       │   ├── App/              # 应用入口
-│       │   ├── Bridge/           # JSBridge 实现
-│       │   ├── Offline/          # 离线包管理
-│       │   ├── Shell/            # 导航容器
-│       │   └── WebView/          # WebView 封装
-│       └── Podfile
-│
-└── packages/                     # 共享包
-    ├── bridge-protocol/          # Bridge 类型定义
-    │   ├── src/index.ts          # 17 个 action 类型
-    │   └── package.json
-    │
-    └── offline-packager/         # 离线包打包工具
-        ├── src/cli.ts            # CLI 入口
-        └── package.json
-```
+以新增 `device.audio` 为例：
+
+1. **协议层**：在 `packages/bridge-protocol/src/index.ts` 的 `BridgeActionMap` 增加 `{ params, result }` 类型（H5 与原生共享，类型即契约）。
+2. **Android**：
+   - 新建 `native/android/.../bridge/plugins/XxxPlugin.kt`（实现 `BridgePlugin`，`namespace.method`）。
+   - 在 `JSBridge.kt` 的 `init()` 里 `register(XxxPlugin(ctx))`。
+   - 在 `AndroidManifest.xml` 加所需权限（如录音 `RECORD_AUDIO`）；运行时权限在 `MainActivity` 预请求。
+3. **iOS**：
+   - 新建 `native/ios/HybridApp/Bridge/Plugins/XxxPlugin.swift`。
+   - 在 `HybridWebViewController.viewDidLoad` 的注册列表加 `bridge.register(plugin: XxxPlugin())`。
+   - 在 `Info.plist` 加权限描述（如 `NSMicrophoneUsageDescription`）。
+   - ⚠️ **回传链路必看**：`JSBridgeContentController` 必须持有 `webView`（`bridge.attach(webView:)`），回传用 `webView.evaluateJavaScript(...)`；且注入脚本需提供 `window.NativeBridge.invoke` 转发到 `messageHandlers.NativeBridgeInvoke`，否则真机上 `call()` 会全部降级成 mock、原生能力失效。
+4. **H5**：在业务里 `await call('device.xxx.method', params)` 即可。
 
 ---
 
-## 八、贡献指南
+## 七、环境要求
 
-### 8.1 代码提交规范
+| 工具 | 要求 |
+|------|------|
+| Node.js | ≥ 18（推荐 LTS） |
+| npm | ≥ 9（已适配 workspaces） |
+| iOS 原生 | macOS + Xcode 14+ + CocoaPods |
+| Android 原生 | Android Studio 2022.1+（API 24+） |
 
-使用 Conventional Commits 规范：
+---
 
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-**Type 类型**：
-
-- `feat`: 新功能
-- `fix`: 修复 Bug
-- `docs`: 文档更新
-- `style`: 代码格式调整
-- `refactor`: 重构代码
-- `test`: 测试相关
-- `chore`: 构建/工具相关
-
-**示例**：
+## 八、快速开始
 
 ```bash
-feat(bridge): 新增蓝牙设备扫描能力
+# 1. 安装全部工作区依赖
+npm install
 
-- 新增 device.bluetooth.scan action
-- 支持设备过滤和超时设置
-- 添加 Android/iOS 双端实现
+# 2. 启动 H5 开发服务器（Vite，HMR）
+npm run dev
+#    访问 http://localhost:5173/  （或手机访问 http://<电脑IP>:5173/）
 
-Closes #123
+# 3. 类型检查 + 生产构建
+npm run build
 ```
 
-### 8.2 分支管理策略
+**真机快速验证**：手机连电脑，跑 `npm run dev`，手机浏览器访问 `电脑IP:5173`。该地址是 `localhost` 安全上下文，语音复盘会走浏览器 `MediaRecorder` 真录真放，无需打包即可验证 H5 逻辑。
 
-- `main`: 主分支，稳定版本
-- `develop`: 开发分支，日常开发
-- `feature/*`: 功能分支
-- `hotfix/*`: 紧急修复分支
+**原生运行（需原生环境）**
 
-**工作流程**：
+```bash
+# iOS
+cd native/ios && pod install && open HybridApp.xcworkspace   # Xcode 运行
 
-1. 从 `develop` 创建 `feature/xxx` 分支
-2. 开发完成后提交 Pull Request
-3. 代码审查通过后合并到 `develop`
-4. 测试通过后合并到 `main`
-
-### 8.3 代码风格
-
-- 遵循 ESLint + Prettier 配置
-- 使用 TypeScript 严格模式
-- 组件命名：PascalCase
-- 文件命名：kebab-case
+# Android
+# 用 Android Studio 打开 native/android 运行（离线包已含最新 h5/dist）
+```
 
 ---
 
-## 九、常见问题解答
+## 九、构建与离线包
 
-### Q1: H5 页面如何调试？
+```bash
+# H5 构建（含 vue-tsc 类型检查）→ 产物 h5/dist
+npm run build
 
-**A**: 
-- 浏览器：打开 Chrome DevTools，访问 `http://localhost:5173/`
-- 原生 WebView：
-  - iOS：Safari → 开发 → 模拟器 → 选择页面
-  - Android：Chrome → `chrome://inspect` → 选择设备
+# Android：把 h5/dist 同步进预置离线包，再 Android Studio 重打包 APK
+rm -rf native/android/app/src/main/assets/offline
+cp -r h5/dist/. native/android/app/src/main/assets/offline/
 
-### Q2: 如何新增原生能力？
+# iOS：出离线包并上传服务端（运行时按版本下发）
+npm run build:offline     # 构建离线包工具
+npm run pack:offline      # 生成 manifest.json + package.zip 到 output/
+#   自定义：npm run pack:offline -- --version 1.0.1 --src h5/dist --output ./output
+```
 
-**A**:
-1. 在 `packages/bridge-protocol/src/index.ts` 添加类型定义
-2. iOS：在 `native/ios/HybridApp/Bridge/Plugins/` 新增 Plugin
-3. Android：在 `native/android/app/src/main/java/com/example/hybrid/bridge/plugins/` 新增 Plugin
-4. 注册到 JSBridge 插件列表
-
-### Q3: 如何修改 API 地址？
-
-**A**: 编辑根目录 `.env` 文件中的 `VITE_API_BASE_URL`
-
-### Q4: 为什么构建后页面空白？
-
-**A**: 
-- 检查 `vite.config.ts` 的 `base` 配置（应为 `'./'`）
-- 检查服务器是否支持 SPA 路由（Nginx 配置 `try_files $uri $uri/ /index.html`）
-
-### Q5: 如何处理跨域问题？
-
-**A**:
-- 开发环境：Vite 已配置 CORS
-- 生产环境：配置 Nginx 反向代理或后端支持 CORS
-
-### Q6: 如何实现热更新？
-
-**A**:
-- H5：通过离线包机制实现（原生检查版本 → 下载新包 → 解压覆盖）
-- 原生：需发布到应用商店（iOS/Android 审核流程）
-
-### Q7: 如何优化首屏加载速度？
-
-**A**:
-- WebView 池化预热（原生层已实现）
-- 离线包预加载（原生层已实现）
-- 骨架屏（H5 已实现）
-- 代码分割 + Tree Shaking（构建时已优化）
-
-### Q8: Token 如何管理？
-
-**A**:
-- 存储在原生 `storage.local`（跨 WebView 共享）
-- H5 启动时从原生拉取到内存缓存
-- 401 时自动清除并触发重新登录
-
-### Q9: 如何支持多语言？
-
-**A**:
-- H5：使用 Vue I18n
-- 原生：iOS 使用 Localizable.strings，Android 使用 strings.xml
-- 通过 Bridge 同步语言设置
-
-### Q10: 如何处理 Android 返回键？
-
-**A**:
-- 原生层拦截返回键事件
-- 如果 H5 路由栈有历史 → 调用 `navigateBack()`
-- 否则退出应用
+环境变量统一在根目录 `.env`（详见文件内注释：`APP_VERSION` / `H5_DEV_PORT` / `VITE_API_BASE_URL` / `OFFLINE_MANIFEST_URL` / `BRIDGE_GLOBAL_NAME` 等）。
 
 ---
 
-## 十、技术支持
+## 十、已知坑 / FAQ
 
-### 文档
-
-- [混合架构App开发模板方案.md](混合架构App开发模板方案.md) — 完整技术方案
-- [API 文档](docs/api.md) — 接口文档（待补充）
-- [原生开发指南](docs/native-dev.md) — 原生开发指南（待补充）
-
-### 联系方式
-
-- Issue: [GitHub Issues](https://github.com/your-org/nativeApp-demo/issues)
-- Email: dev-team@example.com
+- **iOS 桥双向死链（已修复，加新 action 必看）**：旧版 `JSBridge.callback` 调插件的 `evalJS`（空实现）导致回传不执行；且注入脚本缺 `window.NativeBridge.invoke`，导致 `call()` 全走 mock。修复见第六节第 3 步。所有 iOS 原生能力（相机/定位/扫码/录音）均依赖此链路。
+- **真机录音必须走原生**：离线包以 `file://` 加载，`getUserMedia`/`MediaRecorder` 要求安全上下文（https/localhost），`file://` 不满足 → 纯 H5 录音在真机离线包不可用，故录音走 `device.audio` 原生桥。
+- **Dialog 居中**：函数式 `showConfirmDialog` 的 `.van-popup--center` 居中 CSS 不被自动打包，已在 `src/styles/dialog.scss` 手动补齐 `position:fixed; top/left:50%; transform:translate(-50%,-50%)`。
+- **Toast 跨 WebView 残留**：每个原生 Tab 是独立 WebView，切走时 `setTimeout` 被挂起导致 Toast 不消失；`utils/toast.ts` 已在 `visibilitychange` / 路由切换时强制清理。
+- **首屏空白**：检查 `vite.config.ts` 的 `base` 应为相对路径 `./`，且静态服务器需支持 SPA 回退（`try_files $uri $uri/ /index.html`）。
+- **跨域**：开发环境 Vite 已配代理；生产由 Nginx 反向代理或后端 CORS。
 
 ---
 
-## 十一、许可证
+## 十一、代码规范
 
-MIT License
+提交遵循 Conventional Commits（`feat` / `fix` / `docs` / `style` / `refactor` / `test` / `chore`）。分支建议 `main`（稳定）/ `develop`（日常）/ `feature/*` / `hotfix/*`。TypeScript 严格模式，组件 PascalCase、文件 kebab-case。
 
-Copyright (c) 2026 Your Organization
+---
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+## 十二、许可证
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+MIT License。

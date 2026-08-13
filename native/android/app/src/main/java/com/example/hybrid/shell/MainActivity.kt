@@ -1,11 +1,14 @@
 package com.example.hybrid.shell
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
 import android.view.ViewTreeObserver
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.FragmentStatePagerAdapter
@@ -39,8 +42,15 @@ class MainActivity : AppCompatActivity() {
 
     private val titles = arrayOf("记事项", "统计", "总结", "每日计划")
 
+    /** 麦克风权限请求码（语音复盘录音桥） */
+    private val REQUEST_RECORD_AUDIO = 1001
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 预请求麦克风权限（语音复盘录音桥需原生环境录音；离线包 file:// 下 H5 自身不可用）
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_RECORD_AUDIO)
+        }
         setContentView(R.layout.activity_main)
 
         viewPager = findViewById(R.id.viewPager)

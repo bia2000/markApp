@@ -71,22 +71,53 @@
       />
     </div>
 
-    <!-- 文字复盘 -->
+    <!-- 复盘：文字 / 语音切换 -->
     <div class="summary__card card">
-      <div class="summary__block-title">
-        文字复盘
-        <span class="summary__savehint">{{ saveHint || (noteText.trim() ? '已保存' : '') }}</span>
+      <div class="summary__seg">
+        <button class="summary__seg-btn" :class="{ 'is-active': mode === 'text' }" @click="mode = 'text'">文字</button>
+        <button class="summary__seg-btn" :class="{ 'is-active': mode === 'voice' }" @click="mode = 'voice'">语音</button>
       </div>
-      <van-field
-        v-model="noteText"
-        type="textarea"
-        rows="4"
-        autosize
-        :border="false"
-        placeholder="写点什么记录今天：状态、心得、想记住的瞬间……"
-        @input="onInput"
-      />
-      <div class="summary__counter">{{ noteText.length }} 字</div>
+
+      <!-- 文字面板 -->
+      <template v-if="mode === 'text'">
+        <div class="summary__block-title">
+          文字复盘
+          <span class="summary__savehint">{{ saveHint || (noteText.trim() ? '已保存' : '') }}</span>
+        </div>
+        <van-field
+          v-model="noteText"
+          type="textarea"
+          rows="4"
+          autosize
+          :border="false"
+          placeholder="写点什么记录今天：状态、心得、想记住的瞬间……"
+          @input="onInput"
+        />
+        <div class="summary__counter">{{ noteText.length }} 字</div>
+      </template>
+
+      <!-- 语音面板 -->
+      <template v-else>
+        <div class="summary__block-title">语音复盘</div>
+        <div class="voice-bar">
+          <button class="voice-rec" :class="{ 'is-recording': recording }" :disabled="busy" @click="onToggleRec">
+            <van-icon :name="recording ? 'pause' : 'volume-o'" />
+          </button>
+          <div class="voice-meta">
+            <div class="voice-status">{{ recording ? '录音中…' : '点击开始录音' }}</div>
+            <div v-if="recording" class="voice-time">{{ formatTime(elapsed) }}</div>
+          </div>
+        </div>
+        <div class="voice-list">
+          <div v-for="c in audioClips" :key="c.id" class="voice-item">
+            <van-icon name="volume-o" class="voice-item__icon" />
+            <audio :src="audioSrc(c)" controls preload="none" class="voice-item__player" />
+            <span class="voice-item__dur">{{ c.duration }}s</span>
+            <van-icon name="delete-o" class="voice-item__del" @click="onDeleteAudio(c)" />
+          </div>
+          <van-empty v-if="!audioClips.length" image="search" description="还没有语音复盘" />
+        </div>
+      </template>
     </div>
 
     <!-- 历史日期选择 -->
@@ -107,6 +138,10 @@ import { ref, computed, onActivated, onDeactivated } from 'vue';
 import { useTodoStore } from '@/stores/todo';
 import { useSummaryStore } from '@/stores/summary';
 import { addDays, compareDate, dateToStr, formatCN, timeStr, todayStr } from '@/utils/date';
+import { useAudioRecorder, type AudioClip } from '@/composables/useAudioRecorder';
+import { getAudio } from '@/utils/idb';
+import { confirm } from '@/utils/dialog';
+import toast from '@/utils/toast';
 
 defineOptions({ name: 'summary' });
 
@@ -147,12 +182,71 @@ function goDate(target: string): void {
   currentDate.value = target;
   noteText.value = summary.getNote(target);
   saveHint.value = noteText.value.trim() ? '已保存' : '';
+  void loadAudios(target);
 }
 
 // ===== 文字复盘（防抖自动保存） =====
 const noteText = ref<string>(summary.getNote(currentDate.value));
 const saveHint = ref<string>(noteText.value.trim() ? '已保存' : '');
 let saveTimer: number | undefined;
+
+// ===== 语音复盘（录音桥 / 浏览器 MediaRecorder 双适配） =====
+const mode = ref<'text' | 'voice'>('text');
+const busy = ref(false);
+const audioClips = ref<AudioClip[]>([]);
+const { recording, elapsed, start, stop } = useAudioRecorder();
+
+/** 当前日期的语音：从 IndexedDB 取 base64 组装成可播放列表 */
+async function loadAudios(date: string): Promise<void> {
+  const metas = summary.getAudios(date);
+  const clips: AudioClip[] = [];
+  for (const m of metas) {
+    const full = await getAudio(m.id);
+    if (full) clips.push({ id: m.id, duration: m.duration, mime: m.mime, base64: full.data });
+  }
+  audioClips.value = clips;
+}
+
+/** 点按：录音中→停止并保存；否则→开始 */
+async function onToggleRec(): Promise<void> {
+  if (busy.value) return;
+  try {
+    if (recording.value) {
+      busy.value = true;
+      const clip = await stop();
+      await summary.addAudio(currentDate.value, clip);
+      await loadAudios(currentDate.value);
+      toast.success('已保存语音');
+    } else {
+      await start();
+    }
+  } catch (e) {
+    recording.value = false;
+    toast.error((e as Error)?.message || '录音失败');
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function onDeleteAudio(c: AudioClip): Promise<void> {
+  try {
+    await confirm({ title: '删除语音', message: '确定删除这段语音复盘？', danger: true });
+    await summary.removeAudio(currentDate.value, c.id);
+    await loadAudios(currentDate.value);
+  } catch {
+    /* 取消 */
+  }
+}
+
+function audioSrc(c: AudioClip): string {
+  return `data:${c.mime};base64,${c.base64}`;
+}
+
+function formatTime(s: number): string {
+  const m = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+}
 
 function onInput(): void {
   if (saveTimer) clearTimeout(saveTimer);
@@ -174,6 +268,7 @@ function saveNow(): void {
 // keep-alive：切回时同步最新（跨 WebView 已由 __todoResync 重读，这里兜底当前日期文本）
 onActivated(() => {
   noteText.value = summary.getNote(currentDate.value);
+  void loadAudios(currentDate.value);
 });
 onDeactivated(() => {
   saveNow();
@@ -403,9 +498,112 @@ function sumFormatter(day: any): any {
     transition: width 0.3s ease;
   }
 }
-.hour-count {
-  width: 20px;
-  text-align: right;
-  color: $color-text-secondary;
+  .hour-count {
+    width: 20px;
+    text-align: right;
+    color: $color-text-secondary;
+  }
+
+  // 文字/语音切换
+  .summary__seg {
+    display: flex;
+    gap: 4px;
+    margin-bottom: $spacing-lg;
+    background: $color-background;
+    border-radius: 999px;
+    padding: 4px;
+  }
+  .summary__seg-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: $spacing-sm 0;
+    border-radius: 999px;
+    font-size: $font-md;
+    color: $color-text-secondary;
+    cursor: pointer;
+    &.is-active {
+      background: #fff;
+      color: $color-primary;
+      font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    }
+  }
+
+  // 语音复盘
+  .voice-bar {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+    padding: $spacing-md 0;
+  }
+  .voice-rec {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    background: $color-primary;
+    color: #fff;
+    font-size: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.2s ease;
+    &.is-recording {
+      background: $color-danger;
+      animation: voice-pulse 1.2s ease-in-out infinite;
+    }
+    &:disabled {
+      opacity: 0.6;
+    }
+  }
+  .voice-meta {
+    flex: 1;
+    min-width: 0;
+  }
+  .voice-status {
+    font-size: $font-md;
+    color: $color-text;
+  }
+  .voice-time {
+    margin-top: 2px;
+    font-size: $font-sm;
+    color: $color-danger;
+    font-variant-numeric: tabular-nums;
+  }
+  .voice-list {
+    margin-top: $spacing-sm;
+  }
+  .voice-item {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-xs 0;
+    &__icon {
+      color: $color-primary;
+      font-size: 18px;
+    }
+    &__player {
+      flex: 1;
+      height: 36px;
+      min-width: 0;
+    }
+    &__dur {
+      font-size: $font-xs;
+      color: $color-text-secondary;
+      font-variant-numeric: tabular-nums;
+    }
+    &__del {
+      color: $color-danger;
+      font-size: 18px;
+      padding: 0 2px;
+    }
+  }
+
+@keyframes voice-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
 }
 </style>

@@ -5,10 +5,17 @@ final class JSBridgeContentController: WKUserContentController, WKScriptMessageH
 
     private var plugins: [String: BridgePlugin] = [:]
     private let messageName = "NativeBridgeInvoke"
+    /// 持有所属 WebView，用于把 callback / event 真正执行回 H5（混合架构下每个 Tab 一个 WebView）
+    private weak var webView: WKWebView?
 
     override init() {
         super.init()
         add(self, name: messageName)
+    }
+
+    /// 由 HybridWebViewController 在创建 WKWebView 后挂载，使回传链路可用
+    func attach(webView: WKWebView) {
+        self.webView = webView
     }
 
     func register(plugin: BridgePlugin) {
@@ -50,8 +57,7 @@ final class JSBridgeContentController: WKUserContentController, WKScriptMessageH
               let json = String(data: data, encoding: .utf8) else { return }
         let escaped = json.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
         let js = "window.NativeBridge && window.NativeBridge._recvCallback && window.NativeBridge._recvCallback('\(escaped)');"
-        // 在当前 webView 上执行（由 plugin 持有）
-        plugins.values.forEach { $0.evalJS(js) }
+        webView?.evaluateJavaScript(js, completionHandler: nil)
     }
 
     /// 原生派发事件到 H5
@@ -65,7 +71,7 @@ final class JSBridgeContentController: WKUserContentController, WKScriptMessageH
               let json = String(data: data, encoding: .utf8) else { return }
         let escaped = json.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
         let js = "window.NativeBridge && window.NativeBridge._recvEvent && window.NativeBridge._recvEvent('\(escaped)');"
-        plugins.values.forEach { $0.evalJS(js) }
+        webView?.evaluateJavaScript(js, completionHandler: nil)
     }
 }
 
@@ -81,13 +87,6 @@ protocol BridgePlugin: AnyObject {
     var namespace: String { get }
     var bridge: JSBridgeContentController? { get set }
     func handle(method: String, params: Any, completion: @escaping (BridgeResult) -> Void)
-    func evalJS(_ js: String)
-}
-
-extension BridgePlugin {
-    func evalJS(_ js: String) {
-        // 由具体插件持有 webView 时调用，否则忽略
-    }
 }
 
 /// 事件总线：原生全局事件派发

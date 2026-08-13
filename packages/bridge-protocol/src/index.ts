@@ -80,6 +80,23 @@ export interface TakePhotoResult {
   height?: number;
 }
 
+// audio（语音复盘录音桥：H5 发指令，原生录完回传 base64）
+export interface AudioStartParams {
+  /** 期望格式，原生按能力选择；默认 m4a(android/ios) 或 webm(浏览器) */
+  format?: 'm4a' | 'webm' | 'mp3';
+}
+export interface AudioStartResult {
+  started: boolean;
+}
+export interface AudioStopResult {
+  /** 音频 base64（不含 data: 前缀），H5 自行拼 data:audio/xxx;base64, */
+  base64: string;
+  /** 时长（秒） */
+  duration: number;
+  /** 编码格式，决定 H5 拼接的 mime */
+  format: 'm4a' | 'webm' | 'mp3' | '3gp';
+}
+
 export interface LocationParams {
   type?: 'wgs84' | 'gcj02';
 }
@@ -263,6 +280,8 @@ export interface BridgeActionMap {
   'device.getPlatform': { params: void; result: PlatformInfo };
   'device.getDeviceId': { params: void; result: GetDeviceIdResult };
   'device.camera.takePhoto': { params: TakePhotoParams; result: TakePhotoResult };
+  'device.audio.start': { params: AudioStartParams; result: AudioStartResult };
+  'device.audio.stop': { params: void; result: AudioStopResult };
   'device.location.get': { params: LocationParams; result: LocationResult };
   'device.scan.scanCode': { params: ScanParams; result: ScanResult };
   'storage.local.set': { params: StorageSetParams; result: { code: number } };

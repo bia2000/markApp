@@ -19,6 +19,7 @@ import com.example.hybrid.bridge.plugins.AppPlugin
 import com.example.hybrid.bridge.plugins.ShortcutPlugin
 import com.example.hybrid.bridge.plugins.WidgetPlugin
 import com.example.hybrid.bridge.plugins.AppReadyPlugin
+import com.example.hybrid.bridge.plugins.AudioPlugin
 import org.json.JSONObject
 
 /**
@@ -184,6 +185,7 @@ class JSBridge private constructor(private val context: Context) {
             register(ShortcutPlugin(context.applicationContext))
             register(WidgetPlugin(context.applicationContext))
             register(AppReadyPlugin())
+            register(AudioPlugin(context.applicationContext))
         }
 
         fun register(plugin: BridgePlugin) {

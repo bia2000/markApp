@@ -26,11 +26,13 @@ final class HybridWebViewController: UIViewController {
         bridge.register(plugin: NavPlugin())
         bridge.register(plugin: SharePlugin())
         bridge.register(plugin: AppPlugin())
+        bridge.register(plugin: AudioPlugin())
         config.userContentController = bridge
         config.allowsInlineMediaPlayback = true
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
 
         webView = WKWebView(frame: .zero, configuration: config)
+        bridge.attach(webView: webView)
         webView.scrollView.bounces = false
         webView.navigationDelegate = OfflinePackageHandler.shared
         webView.uiDelegate = self
@@ -59,13 +61,17 @@ final class HybridWebViewController: UIViewController {
         }
     }
 
-    /// 注入 H5 侧的接收器：window.NativeBridge._recvCallback / _recvEvent
+    /// 注入 H5 侧的接收器：window.NativeBridge._recvCallback / _recvEvent / invoke
     private func injectBridgeReceiver() {
         let script = """
         (function(){
           window.NativeBridge = window.NativeBridge || {};
+          // iOS 通过 WKScriptMessageHandler 收 invoke，此处把 window.NativeBridge.invoke
+          // 转发到 messageHandlers，使 H5 的 call() 能真正打到原生（Android 用 @JavascriptInterface 直挂 invoke）。
+          window.NativeBridge.invoke = function(payload){
+            try { window.webkit.messageHandlers.NativeBridgeInvoke.postMessage(payload); } catch(e) {}
+          };
           window.NativeBridge._recvCallback = function(payload){
-            // 由原生通过 evaluateJavaScript 调用，直接转发给 H5 实现的 _recvCallback
             if (window.__bridgeRecvCallback) window.__bridgeRecvCallback(payload);
           };
           window.NativeBridge._recvEvent = function(payload){

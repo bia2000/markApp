@@ -4,6 +4,12 @@
 - 真机 WebView 加载的是**原生壳离线包**，不是 h5/dist。H5 改完必须「build + 同步进离线包 + 重打包原生壳」才在真机生效。
 - **Android**：离线包在 `native/android/app/src/main/assets/offline/`（预置资源，打进 APK）。需 `npm run build`（h5）→ 把 `h5/dist` 整体 cp 进该目录 → Android Studio 重打 APK。WebView 加载路径 `file:///android_asset/offline`（`BaseWebFragment.kt`）。
 - **iOS**：离线包在沙盒 `Documents/offline/<version>/`（`OfflinePackageHandler.swift`），运行时从服务端 `app.example.com/offline/manifest.json` 按版本比对下发。本地改完需走 `npm run build:offline` + `npm run pack:offline` 出包上传发布，真机版本比对后下载。
+
+## iOS 桥回传/调用链路（历史坑，加任何原生 action 前必看）
+- 这份 iOS 桥原生是**双向全断**的，影响所有 action，2026-08-13 已修：
+  1. **回传死链**：旧 `JSBridge.callback/dispatchEvent` 调 `plugins.values.forEach { $0.evalJS(js) }`，但 `BridgePlugin` 协议里的 `evalJS` 是空实现、Plugin 也不持 webView → 原生回传永远不执行。正确做法：`JSBridgeContentController` 持 `weak var webView`，回传直接 `webView?.evaluateJavaScript(js)`；`HybridWebViewController` 建好 `webView` 后 `bridge.attach(webView:)`。
+  2. **调用死链（更隐蔽）**：H5 `call()` 走 `window.NativeBridge.invoke(...)`，但 iOS 只通过 `WKScriptMessageHandler`(名 `NativeBridgeInvoke`) 收消息，`injectBridgeReceiver` 必须注入 `window.NativeBridge.invoke = p => window.webkit.messageHandlers.NativeBridgeInvoke.postMessage(p)`。否则真机上 `native.invoke` 为 undefined → `call()` 全掉 mock（`device.getPlatform` 返回 web），一切原生能力（含录音）在 iOS 失效。
+- 加新原生 action 的标准动作：① `BridgePlugin` 子类（namespace.method）+ 在 `HybridWebViewController.viewDidLoad` `bridge.register(plugin:)`；② `Info.plist` 加所需权限描述（如麦克风 `NSMicrophoneUsageDescription`）；③ 回传用 `completion(BridgeResult(code,msg,data))`，data 用 `[String:Any]` 字典（H5 按字段取）。
 - **快速真机验证**：手机连电脑跑 `npm run dev`（vite host 已开 0.0.0.0），手机访问 `电脑IP:5173`，绕开离线包直接看新 H5。
 - 注意：`build` 在本机需 `env -u CODEBUDDY_SESSION_ID -u CLAUDE_SESSION_ID` 绕过 safe-delete shim 才能删旧 dist；删 native 下 offline 目录可直接 `rm -rf`（shell 已授权 bypass）。
 

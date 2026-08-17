@@ -15,6 +15,12 @@ import java.util.zip.ZipInputStream
  */
 object OfflinePackage {
 
+    /** 服务端 manifest 地址（TODO: 后续由构建配置注入，替换硬编码） */
+    private const val OFFLINE_MANIFEST_URL = "https://app.example.com/offline/manifest.json"
+
+    /** 离线包未命中时的开发服务器入口（真机用电脑局域网 IP，模拟器用 10.0.2.2） */
+    private const val DEV_ENTRY_URL = "http://192.168.121.34:5173/"
+
     private lateinit var rootDir: File
     private var currentVersion: String = "0"
 
@@ -38,7 +44,7 @@ object OfflinePackage {
     fun checkUpdate() {
         Thread {
             try {
-                val url = URL("https://app.example.com/offline/manifest.json")
+                val url = URL(OFFLINE_MANIFEST_URL)
                 val conn = url.openConnection()
                 val manifest = conn.getInputStream().bufferedReader().readText()
                 val regex = """"version"\s*:\s*"([^"]+)"""".toRegex()
@@ -68,6 +74,10 @@ object OfflinePackage {
                 var entry = zis.nextEntry
                 while (entry != null) {
                     val outFile = File(targetDir, entry.name)
+                    // Zip Slip 防护：entry 名可能包含 ../ 造成路径穿越，必须校验最终路径仍在解压目录内
+                    if (!outFile.canonicalPath.startsWith(targetDir.canonicalPath + File.separator)) {
+                        throw SecurityException("zip entry escapes target dir: ${entry.name}")
+                    }
                     if (entry.isDirectory) outFile.mkdirs()
                     else {
                         outFile.parentFile?.mkdirs()
@@ -77,7 +87,16 @@ object OfflinePackage {
                 }
             }
             zipFile.delete()
-            currentVersion = version
+            // 把 zip 内的 manifest 持久化到根目录：loadLocalVersion 依赖它恢复版本号，
+            // 缺失会导致重启后版本回退到 "0"、每次启动重复下载。
+            val extractedManifest = File(targetDir, "manifest.json")
+            if (extractedManifest.exists()) {
+                extractedManifest.copyTo(File(rootDir, "manifest.json"), overwrite = true)
+                currentVersion = version
+            } else {
+                // manifest 缺失视为坏包：回滚本次解压，不更新版本
+                targetDir.deleteRecursively()
+            }
         } catch (e: Exception) {
             // ignore
         }
@@ -86,8 +105,7 @@ object OfflinePackage {
     /** 入口 URL：本地离线包 index.html，未命中返回开发服务器地址 */
     fun entryUrl(): String? {
         val entry = File(rootDir, "$currentVersion/index.html")
-        // 真机使用电脑局域网 IP，模拟器使用 10.0.2.2
-        return if (entry.exists()) "file://${entry.absolutePath}" else "http://192.168.121.34:5173/"
+        return if (entry.exists()) "file://${entry.absolutePath}" else DEV_ENTRY_URL
     }
 
     /** 获取当前离线包版本 */

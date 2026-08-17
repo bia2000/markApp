@@ -10,6 +10,8 @@ import { ref, computed } from 'vue';
 import { storage } from '@/utils/storage';
 import { call } from '@/bridge';
 import { todayStr, dateToStr, timeStr, mondayOf, formatMD } from '@/utils/date';
+import { uid } from '@/utils/uid';
+import { aggregateByItem } from '@/utils/dayStats';
 
 export interface TodoItem {
   id: string;
@@ -43,10 +45,6 @@ const ITEMS_KEY = 'notepad:items';
 const RECORDS_KEY = 'notepad:records';
 
 const PALETTE = ['#1989fa', '#07c160', '#ff976a', '#7232dd', '#ee0a24', '#00b8d9', '#ff8f1f'];
-
-function uid(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
 
 export const useTodoStore = defineStore('todo', () => {
   const items = ref<TodoItem[]>(storage.getJSON<TodoItem[]>(ITEMS_KEY, []));
@@ -185,20 +183,7 @@ export const useTodoStore = defineStore('todo', () => {
   );
 
   /** 今日各事项完成次数与得分 */
-  const todayStats = computed(() => {
-    const map = new Map<string, { id: string; title: string; count: number; color: string; score: number }>();
-    for (const r of todayRecords.value) {
-      let e = map.get(r.itemId);
-      if (!e) {
-        const item = items.value.find((i) => i.id === r.itemId);
-        e = { id: r.itemId, title: r.title, count: 0, color: item?.color || '#1989fa', score: 0 };
-        map.set(r.itemId, e);
-      }
-      e.count += 1;
-      e.score += r.score ?? 1;
-    }
-    return [...map.values()];
-  });
+  const todayStats = computed(() => aggregateByItem(todayRecords.value, items.value));
 
   /** 今日得分（今日所有记录分值之和） */
   const todayScore = computed(() =>
@@ -217,6 +202,18 @@ export const useTodoStore = defineStore('todo', () => {
     const set = new Set<string>();
     for (const r of records.value) set.add(r.date);
     return set;
+  });
+
+  /** 连续打卡天数：今天没打不急于断签，从昨天起算 */
+  const streak = computed(() => {
+    let count = 0;
+    const d = new Date();
+    if (!recordedDates.value.has(dateToStr(d))) d.setDate(d.getDate() - 1);
+    while (recordedDates.value.has(dateToStr(d))) {
+      count += 1;
+      d.setDate(d.getDate() - 1);
+    }
+    return count;
   });
 
   /** 周统计：按周一归组，最近周在前 */
@@ -258,21 +255,10 @@ export const useTodoStore = defineStore('todo', () => {
     return [...byWeek.values()].sort((a, b) => (a.key < b.key ? 1 : -1));
   });
 
-  /** 累计排行：按事项统计全部记录数与得分 */
-  const cumulative = computed(() => {
-    const map = new Map<string, { itemId: string; title: string; count: number; color: string; score: number }>();
-    for (const r of records.value) {
-      let e = map.get(r.itemId);
-      if (!e) {
-        const item = items.value.find((i) => i.id === r.itemId);
-        e = { itemId: r.itemId, title: r.title, count: 0, color: item?.color || '#1989fa', score: 0 };
-        map.set(r.itemId, e);
-      }
-      e.count += 1;
-      e.score += r.score ?? 1;
-    }
-    return [...map.values()].sort((a, b) => b.score - a.score);
-  });
+  /** 累计排行：按事项统计全部记录数与得分（得分降序） */
+  const cumulative = computed(() =>
+    aggregateByItem(records.value, items.value).sort((a, b) => b.score - a.score)
+  );
 
   return {
     items,
@@ -288,6 +274,7 @@ export const useTodoStore = defineStore('todo', () => {
     todayScore,
     recordsByDate,
     recordedDates,
+    streak,
     weekly,
     cumulative,
     rehydrate,

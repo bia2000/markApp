@@ -1,1 +1,0 @@
-import{l as r}from"./vant-D6hnK3Vt.js";function n(e){var a,t;return r({title:e.title,message:e.message,confirmButtonText:(a=e.confirmText)!=null?a:"确定",cancelButtonText:(t=e.cancelText)!=null?t:"取消",className:e.danger?"app-dialog--danger":void 0}).then(()=>{})}export{n as c};

@@ -14,7 +14,8 @@
     "build:offline": "npm run build --workspace @hybrid/offline-packager",
     "pack:offline": "npm start --workspace @hybrid/offline-packager",
     "type-check": "npm run type-check --workspaces --if-present",
-    "lint": "echo \"(placeholder) lint\""
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {
     "typescript": "^5.4.5"

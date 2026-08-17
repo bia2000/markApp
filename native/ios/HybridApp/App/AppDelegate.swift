@@ -8,8 +8,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        // 1. 全局初始化：推送注册、SDK 初始化、权限检查
-        NotificationCenter.setup()
+        // 1. 全局初始化：推送注册、SDK 初始化、权限检查（按需在此补充）
         OfflinePackageHandler.shared.startup()
 
         // 2. 创建根容器：原生 TabBar

@@ -1,0 +1,33 @@
+// 跨页面共享的具体样式类（此前 stats 页原样复制过一份，抽到此处理）。
+// 各页面在自己的 <style scoped> 内 @use 本文件后使用；依赖设计令牌。
+@use './variables.scss' as *;
+
+// 区块标题（home/stats 通用）
+.home__section-title {
+  display: flex;
+  align-items: baseline;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-lg;
+  font-size: $font-lg;
+  font-weight: 600;
+  color: $color-text;
+}
+.home__hint {
+  font-size: $font-xs;
+  font-weight: 400;
+  color: $color-text-secondary;
+}
+
+// 记录列表圆点
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: $spacing-sm;
+  align-self: center;
+}
+
+// 滑动删除按钮
+.del-btn {
+  height: 100%;
+}

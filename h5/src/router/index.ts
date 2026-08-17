@@ -1,5 +1,5 @@
 /**
- * 记事本路由：三个底部 Tab —— 记事项 / 统计 / 总结
+ * 记事本路由：四个底部 Tab —— 记事项 / 统计 / 总结 / 每日计划
  *
  * 底部 TabBar 由原生外壳渲染（方案：根容器为原生 TabBar，每个 Tab 承载一个 WebView）。
  * H5 在 main.ts 启动时会通过 bridge.nav.setTabBar 把本文件的 tab 配置注册给原生壳，
@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
     name: 'dailyGoal',
     component: () => import('@/views/dailyGoal/index.vue'),
     meta: { title: '每日计划', tab: true, tabIndex: 3 }
+  },
+  {
+    path: '/goal-history',
+    name: 'goalHistory',
+    component: () => import('@/views/historyGoal/index.vue'),
+    meta: { title: '历史目标' }
   }
 ];
 

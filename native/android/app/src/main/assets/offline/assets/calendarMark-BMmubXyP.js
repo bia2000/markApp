@@ -1,0 +1,1 @@
+import{e as o}from"./index-BjUxTX6e.js";function n(e){return function(r){if(!r.date)return r;const t=o(r.date);return e.hasRecord(t)&&(e.recordClassName&&(r.className=e.recordClassName),r.bottomInfo=`${e.scoreOf(t)}分`),r}}export{n as m};

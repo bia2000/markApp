@@ -101,7 +101,7 @@ instance.interceptors.response.use(
     return response;
   },
   async (err) => {
-    const config = err.config as InternalAxiosRequestConfig & { __retryCount?: number };
+    const config = err.config as (InternalAxiosRequestConfig & { __retryCount?: number; __silent?: boolean }) | undefined;
     // 网络错误 / 超时重试
     if (
       config &&
@@ -116,15 +116,18 @@ instance.interceptors.response.use(
       cachedToken = null;
       eventBus.emit('auth.expired');
     }
-    const msg = err.response?.data?.msg || err.message || '网络异常，请稍后重试';
-    toast.error(msg);
+    // 非 silent 请求才弹错误提示
+    if (!config?.__silent) {
+      const msg = err.response?.data?.msg || err.message || '网络异常，请稍后重试';
+      toast.error(msg);
+    }
     return Promise.reject(err);
   }
 );
 
 // ========== 业务侧调用方法 ==========
 interface RequestOptions {
-  /** 是否显示错误 toast（默认 true） */
+  /** 静默模式：true 时网络/业务错误不弹 toast（默认 false，即弹提示） */
   silent?: boolean;
   /** 是否参与去重（默认 true） */
   dedupe?: boolean;
@@ -134,7 +137,7 @@ async function request<T = unknown>(
   config: AxiosRequestConfig,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { silent = true, dedupe = true } = options;
+  const { silent = false, dedupe = true } = options;
   const merged: AxiosRequestConfig & { __silent?: boolean } = { ...config };
   merged.__silent = silent;
 

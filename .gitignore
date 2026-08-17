@@ -29,8 +29,20 @@ packages/offline-packager/output
 *.xcworkspace
 
 # env
+.env
 .env.local
 .env.*.local
+
+# vite 构建临时文件
+vite.config.ts.timestamp-*
+
+# 个人开发辅助产物（不入库）
+.workbuddy/
+generated-images/
+.zcode/
+
+# eslint 缓存
+.eslintcache
 
 # logs
 *.log

@@ -12,6 +12,8 @@ interface ImportMeta {
 
 declare module '*.vue' {
   import type { DefineComponent } from 'vue';
+  // Vue 官方脚手架的 .vue 模块 shim 写法，{}/any 是其惯用形态
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-explicit-any
   const component: DefineComponent<{}, {}, any>;
   export default component;
 }

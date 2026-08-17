@@ -72,6 +72,9 @@ final class AudioPlugin: BridgePlugin {
             return
         }
         let base64 = data.base64EncodedString()
+        // 数据已读入内存，删除临时文件，避免 temporaryDirectory 随录音次数无限堆积
+        try? FileManager.default.removeItem(at: url)
+        outputURL = nil
         completion(BridgeResult(code: 0, msg: "ok", data: ["base64": base64, "duration": duration, "format": "m4a"]))
     }
 }

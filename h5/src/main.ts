@@ -11,6 +11,7 @@ import { useAppStore } from './stores/app';
 import { useTodoStore } from './stores/todo';
 import { useSummaryStore } from './stores/summary';
 import { useGoalStore } from './stores/goal';
+import { useMemoStore } from './stores/memo';
 import { eventBus } from './bridge/eventbus';
 
 async function bootstrap(): Promise<void> {
@@ -36,10 +37,12 @@ async function bootstrap(): Promise<void> {
   const todo = useTodoStore();
   const summary = useSummaryStore();
   const goal = useGoalStore();
+  const memo = useMemoStore();
   const resync = (): void => {
     todo.rehydrate();
     summary.rehydrate();
     goal.rehydrate();
+    memo.rehydrate();
     // 合并桌面组件（原生）点记录产生的共享记录，使 App 与组件数据一致
     void resyncWidget();
   };

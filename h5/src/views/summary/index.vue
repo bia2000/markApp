@@ -32,7 +32,7 @@
           <div class="ov-label">较昨日</div>
         </div>
         <div class="ov-item">
-          <div class="ov-num ov-num--streak">{{ streak }}</div>
+          <div class="ov-num ov-num--streak">{{ todo.streak }}</div>
           <div class="ov-label">连续打卡(天)</div>
         </div>
         <div class="ov-item">
@@ -140,9 +140,13 @@ import { useSummaryStore } from '@/stores/summary';
 import { addDays, compareDate, dateToStr, formatCN, timeStr, todayStr } from '@/utils/date';
 import { useAudioRecorder, type AudioClip } from '@/composables/useAudioRecorder';
 import { getAudio } from '@/utils/idb';
-import { confirm } from '@/utils/dialog';
+import { confirmRemove } from '@/utils/dialog';
+import { makeCalendarFormatter } from '@/utils/calendarMark';
+import { aggregateByItem } from '@/utils/dayStats';
 import toast from '@/utils/toast';
 
+// name 与 App.vue keep-alive include 列表严格对应（Tab 页常驻缓存）
+// eslint-disable-next-line vue/no-reserved-component-names
 defineOptions({ name: 'summary' });
 
 const todo = useTodoStore();
@@ -153,7 +157,6 @@ const currentDate = ref<string>(todayStr());
 const showCalendar = ref(false);
 
 const dateLabel = computed(() => formatCN(currentDate.value));
-const isToday = computed(() => currentDate.value === todayStr());
 const canNext = computed(() => compareDate(currentDate.value, todayStr()) < 0);
 
 const calMax = new Date();
@@ -228,14 +231,16 @@ async function onToggleRec(): Promise<void> {
   }
 }
 
-async function onDeleteAudio(c: AudioClip): Promise<void> {
-  try {
-    await confirm({ title: '删除语音', message: '确定删除这段语音复盘？', danger: true });
-    await summary.removeAudio(currentDate.value, c.id);
-    await loadAudios(currentDate.value);
-  } catch {
-    /* 取消 */
-  }
+function onDeleteAudio(c: AudioClip): void {
+  void confirmRemove({
+    title: '删除语音',
+    message: '确定删除这段语音复盘？',
+    action: async () => {
+      await summary.removeAudio(currentDate.value, c.id);
+      await loadAudios(currentDate.value);
+    },
+    successText: '' // 删除后列表已刷新，无需额外提示
+  });
 }
 
 function audioSrc(c: AudioClip): string {
@@ -288,35 +293,12 @@ const diffClass = computed(() => ({
   'ov-num--down': diff.value < 0
 }));
 
-/** 连续打卡天数：今天没打不急于断签，从昨天起算 */
-const streak = computed(() => {
-  const dates = new Set(todo.records.map((r) => r.date));
-  let count = 0;
-  const d = new Date();
-  if (!dates.has(dateToStr(d))) d.setDate(d.getDate() - 1);
-  while (dates.has(dateToStr(d))) {
-    count += 1;
-    d.setDate(d.getDate() - 1);
-  }
-  return count;
-});
+/** 连续打卡天数由 todo store 统一计算（todo.streak），此处不再重复实现 */
 
-/** 当日各事项次数与得分（降序） */
-const dateStats = computed(() => {
-  const recs = todo.recordsByDate(currentDate.value);
-  const map = new Map<string, { id: string; title: string; count: number; color: string; score: number }>();
-  for (const r of recs) {
-    let e = map.get(r.itemId);
-    if (!e) {
-      const item = todo.items.find((i) => i.id === r.itemId);
-      e = { id: r.itemId, title: r.title, count: 0, color: item?.color || '#1989fa', score: 0 };
-      map.set(r.itemId, e);
-    }
-    e.count += 1;
-    e.score += r.score ?? 1;
-  }
-  return [...map.values()].sort((a, b) => b.count - a.count);
-});
+/** 当日各事项次数与得分（次数降序） */
+const dateStats = computed(() =>
+  aggregateByItem(todo.recordsByDate(currentDate.value), todo.items).sort((a, b) => b.count - a.count)
+);
 
 /** 时段分布（按小时分桶） */
 const HOUR_BUCKETS = [
@@ -338,18 +320,11 @@ const hourDist = computed(() => {
   return arr.map((x) => ({ ...x, pct: Math.round((x.count / max) * 100) }));
 });
 
-// 消除未使用变量告警（isToday 供将来扩展，保留引用）
-void isToday;
-
-/** 总结页日期选择日历：已记录日期下方标注当天得分 */
-function sumFormatter(day: any): any {
-  const ds = dateToStr(day.date);
-  if (todo.recordedDates.has(ds)) {
-    const score = todo.recordsByDate(ds).reduce((s, r) => s + (r.score ?? 1), 0);
-    day.bottomInfo = `${score}分`;
-  }
-  return day;
-}
+// 总结页日期选择日历：已记录日期下方标注当天得分
+const sumFormatter = makeCalendarFormatter({
+  hasRecord: (ds) => todo.recordedDates.has(ds),
+  scoreOf: (ds) => todo.recordsByDate(ds).reduce((s, r) => s + (r.score ?? 1), 0)
+});
 </script>
 
 <style lang="scss" scoped>

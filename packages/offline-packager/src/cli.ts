@@ -11,7 +11,7 @@
  *   pnpm pack:offline                    # 默认版本 1.0.0，源 ../h5/dist
  *   pnpm start -- --version 1.0.1 --src ../h5/dist --output ./output
  */
-import { createWriteStream, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve, basename, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -68,8 +68,8 @@ function parseArgs(argv: string[]): CliOptions {
         break;
     }
   }
-  // 默认值
-  const root = fileURLToPath(new URL('../../', import.meta.url));
+  // 默认值：src/cli.ts 向上三级 = monorepo 根（h5/ 与 packages/ 所在处）
+  const root = fileURLToPath(new URL('../../../', import.meta.url));
   if (!opts.src) opts.src = resolve(root, 'h5/dist');
   if (!opts.output) opts.output = resolve(root, 'packages/offline-packager/output');
   return opts;
@@ -107,7 +107,6 @@ function buildManifest(opts: CliOptions, files: ManifestFile[]): Manifest {
 }
 
 function writeManifest(manifest: Manifest, outputDir: string): void {
-  const { writeFileSync, mkdirSync } = require('node:fs');
   mkdirSync(outputDir, { recursive: true });
   const manifestPath = join(outputDir, 'manifest.json');
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
@@ -117,7 +116,13 @@ function writeManifest(manifest: Manifest, outputDir: string): void {
   console.log(`  size:    ${(manifest.totalSize / 1024).toFixed(2)} KB`);
 }
 
-function packZip(srcDir: string, outputPath: string): Promise<void> {
+/**
+ * 打 zip：manifest.json 必须打进 zip 根目录。
+ * 原生侧（Android OfflinePackage / iOS OfflinePackageHandler）解压后依赖
+ * zip 内的 manifest.json 恢复版本号；若只写在 zip 外，重启后版本丢失会
+ * 导致每次启动重复下载。
+ */
+function packZip(srcDir: string, outputPath: string, manifest: Manifest): Promise<void> {
   return new Promise((resolve, reject) => {
     const output = createWriteStream(outputPath);
     const archive = archiver('zip', { zlib: { level: 9 } });
@@ -127,6 +132,7 @@ function packZip(srcDir: string, outputPath: string): Promise<void> {
     });
     archive.on('error', reject);
     archive.pipe(output);
+    archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
     archive.directory(srcDir, false);
     archive.finalize();
   });
@@ -154,13 +160,12 @@ async function main(): Promise<void> {
 
   // 2. 生成 manifest
   const manifest = buildManifest(opts, files);
-  const { mkdirSync } = require('node:fs');
   mkdirSync(opts.output, { recursive: true });
   writeManifest(manifest, opts.output);
 
-  // 3. 打包 zip
+  // 3. 打包 zip（manifest.json 同步打进 zip 根目录）
   const zipPath = join(opts.output, `${opts.version}.zip`);
-  await packZip(opts.src, zipPath);
+  await packZip(opts.src, zipPath, manifest);
 
   console.log('\n==== 完成 ====');
   console.log(`上传 ${zipPath} 与 manifest.json 到 CDN 即可触发原生侧离线包更新。`);

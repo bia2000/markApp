@@ -6,7 +6,6 @@ import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig(({ mode }) => {
   // 读取根目录 .env（用户偏好：所有必要配置统一写入 .env）
-  const env = loadEnv(mode, process.cwd(), '');
   const rootEnv = loadEnv(mode, fileURLToPath(new URL('../', import.meta.url)), '');
 
   const port = Number(rootEnv.H5_DEV_PORT || 5173);

@@ -65,47 +65,116 @@
       </van-cell-group>
     </section>
 
-    <!-- 历史 -->
-    <section v-if="history.length" class="history">
-      <van-collapse v-model="activeHistory">
-        <van-collapse-item title="历史目标" name="history">
-          <div v-for="grp in history" :key="grp.date" class="hist-day">
-            <div class="hist-head">
-              <span>{{ grp.label }}</span>
-              <span class="muted">{{ grp.done }}/{{ grp.total }} 完成</span>
-            </div>
-            <div
-              v-for="item in grp.items"
-              :key="item.id"
-              class="hist-item"
-              :class="{ 'is-done': item.done }"
-            >
-              <van-icon :name="item.done ? 'checked' : 'circle'" :color="item.done ? '#1989fa' : '#c8c9cc'" />
-              <span>{{ item.title }}</span>
-            </div>
-          </div>
-        </van-collapse-item>
-      </van-collapse>
+    <!-- 历史目标入口（点击进入独立页面） -->
+    <section class="history-entry" @click="goHistory">
+      <div class="he-left">
+        <van-icon name="clock-o" class="he-icon" />
+        <span>历史目标</span>
+      </div>
+      <div class="he-right">
+        <span v-if="historyTotal > 0" class="muted">{{ historyTotal }} 条</span>
+        <van-icon name="arrow" class="he-arrow" />
+      </div>
+    </section>
+
+    <!-- 备忘录：不限时间，逐条记录 -->
+    <section class="memo">
+      <div class="memo-head">
+        <span class="memo-title">📝 备忘录</span>
+        <span class="memo-hint">不限时间 · 长期保存</span>
+      </div>
+      <!-- 添加一条 -->
+      <div class="memo-adder">
+        <van-field
+          v-model="memoDraft"
+          placeholder="记一笔，回车或点添加"
+          maxlength="200"
+          border
+          @keyup.enter="onAddMemo"
+        >
+          <template #button>
+            <van-button size="small" type="primary" :disabled="!memoDraft.trim()" @click="onAddMemo">
+              添加
+            </van-button>
+          </template>
+        </van-field>
+      </div>
+      <!-- 逐条列表 -->
+      <van-empty v-if="memoSorted.length === 0" description="暂无备忘" />
+      <van-cell-group v-else inset>
+        <van-cell
+          v-for="m in memoSorted"
+          :key="m.id"
+          :title="m.text"
+          :class="{ 'is-done': m.done }"
+          clickable
+          @click="memoStore.toggleMemo(m.id)"
+        >
+          <template #icon>
+            <van-icon
+              :name="m.done ? 'checked' : 'circle'"
+              :color="m.done ? '#1989fa' : '#c8c9cc'"
+              class="cell-icon"
+            />
+          </template>
+          <template #right-icon>
+            <van-icon name="delete-o" color="#ee0a24" class="cell-del" @click.stop="onDeleteMemo(m)" />
+          </template>
+        </van-cell>
+      </van-cell-group>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated } from 'vue';
+import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useGoalStore, type Goal } from '@/stores/goal';
+import { useMemoStore, type MemoItem } from '@/stores/memo';
 import { todayStr, formatCN } from '@/utils/date';
-import { confirm } from '@/utils/dialog';
-import toast from '@/utils/toast';
+import { confirmRemove } from '@/utils/dialog';
 
+const router = useRouter();
 const goalStore = useGoalStore();
+const memoStore = useMemoStore();
 // state + getters 用 storeToRefs 解构（保持响应性与模板类型正确），actions 留在实例上
 const { todayGoals, todayTotal, todayDone, progress, history } = storeToRefs(goalStore);
+const { items: memoItems } = storeToRefs(memoStore);
+
+// 备忘录排序：未完成在前、已完成沉底（各自保持插入顺序，不改存储顺序）
+const memoSorted = computed(() => {
+  const arr = memoItems.value;
+  return [...arr.filter((m) => !m.done), ...arr.filter((m) => m.done)];
+});
 
 const draft = ref('');
-const activeHistory = ref<string[]>([]);
-
+const memoDraft = ref('');
 const todayLabel = computed(() => formatCN(todayStr()));
+
+// 历史目标总数（用于入口的「N 条」角标）
+const historyTotal = computed(() => history.value.reduce((sum, g) => sum + g.total, 0));
+
+// 跳转历史目标独立页面（子页面，留在每日计划 WebView 内）
+function goHistory(): void {
+  router.push('/goal-history');
+}
+
+// ===== 备忘录（不限时间，逐条）=====
+function onAddMemo(): void {
+  const t = memoDraft.value.trim();
+  if (!t) return;
+  memoStore.addMemo(t);
+  memoDraft.value = '';
+}
+
+function onDeleteMemo(m: MemoItem): void {
+  void confirmRemove({
+    title: '删除备忘',
+    message: '确定删除这条备忘？',
+    action: () => memoStore.removeMemo(m.id)
+  });
+}
 
 function onAdd(): void {
   const t = draft.value.trim();
@@ -114,35 +183,39 @@ function onAdd(): void {
   draft.value = '';
 }
 
-async function onDelete(g: Goal): Promise<void> {
-  try {
-    await confirm({ title: '删除目标', message: '确定删除该目标？', danger: true });
-    goalStore.removeGoal(g.id);
-    toast.success('已删除');
-  } catch {
-    /* 取消 */
-  }
+function onDelete(g: Goal): void {
+  void confirmRemove({
+    title: '删除目标',
+    message: '确定删除该目标？',
+    action: () => goalStore.removeGoal(g.id)
+  });
 }
 
 // 切回本 Tab / 挂载时重新读取，保证跨 WebView 数据最新
-onMounted(() => goalStore.rehydrate());
-onActivated(() => goalStore.rehydrate());
+onMounted(() => {
+  goalStore.rehydrate();
+  memoStore.rehydrate();
+});
+onActivated(() => {
+  goalStore.rehydrate();
+  memoStore.rehydrate();
+});
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .goal-page {
-  padding: 12px 0 24px;
+  padding: $spacing-md 0 $spacing-xl;
   min-height: 100%;
-  background: #f7f8fa;
+  background: #f7f8fa; // Vant 页面底色，无同名令牌
 
   .hero {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 20px 16px;
-    background: #fff;
-    margin: 0 12px 12px;
-    border-radius: 12px;
+    gap: $spacing-lg;
+    padding: 20px $spacing-lg; // 20px 无对应令牌，保持字面量
+    background: $color-background-light;
+    margin: 0 $spacing-md $spacing-md;
+    border-radius: $radius-lg;
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
   }
   .hero-meta {
@@ -152,32 +225,32 @@ onActivated(() => goalStore.rehydrate());
   .hero-date {
     font-size: 16px;
     font-weight: 600;
-    color: #323233;
+    color: $color-text;
   }
   .hero-sub {
     margin-top: 6px;
-    font-size: 13px;
-    color: #646566;
+    font-size: $font-sm;
+    color: $color-text-secondary;
     b {
-      color: #1989fa;
+      color: $color-primary;
     }
     .done {
-      color: #07c160;
+      color: $color-success;
     }
     .muted {
-      color: #c8c9cc;
+      color: $color-text-disabled;
     }
   }
 
   .adder {
-    margin: 0 12px 12px;
+    margin: 0 $spacing-md $spacing-md;
   }
 
   .list {
-    margin: 0 12px 12px;
-    .van-cell-group--inset {
+    margin: 0 $spacing-md $spacing-md;
+    :deep(.van-cell-group--inset) {
       margin: 0;
-      border-radius: 12px;
+      border-radius: $radius-lg;
       overflow: hidden;
     }
     .cell-icon {
@@ -190,40 +263,94 @@ onActivated(() => goalStore.rehydrate());
       align-self: center;
       padding: 0 4px 0 10px;
     }
-    .van-cell.is-done .van-cell__title {
-      color: #c8c9cc;
+    :deep(.van-cell.is-done .van-cell__title) {
+      color: $color-text-disabled;
       text-decoration: line-through;
     }
   }
 
-  .history {
-    margin: 0 12px;
-    .hist-day {
-      padding: 4px 0;
-    }
-    .hist-head {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      font-weight: 600;
-      color: #323233;
-      margin-bottom: 4px;
-    }
-    .hist-item {
+  .history-entry {
+    margin: 0 $spacing-md $spacing-md;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: $color-background-light;
+    border-radius: $radius-lg;
+    padding: $spacing-md $spacing-lg;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    .he-left {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: #646566;
-      padding: 3px 0;
-      &.is-done {
-        color: #c8c9cc;
-        text-decoration: line-through;
-      }
+      gap: $spacing-sm;
+      font-size: $font-md;
+      font-weight: 600;
+      color: $color-text;
+    }
+    .he-icon {
+      font-size: 18px;
+      color: $color-primary;
+    }
+    .he-right {
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+    }
+    .he-arrow {
+      font-size: 16px;
+      color: $color-text-disabled;
     }
     .muted {
-      color: #c8c9cc;
+      font-size: $font-sm;
+      color: $color-text-disabled;
       font-weight: 400;
+    }
+  }
+
+  .memo {
+    margin: 0 $spacing-md;
+    background: $color-background-light;
+    border-radius: $radius-lg;
+    padding: $spacing-md $spacing-lg;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+    .memo-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: $spacing-sm;
+    }
+    .memo-title {
+      font-size: $font-md;
+      font-weight: 600;
+      color: $color-text;
+    }
+    .memo-hint {
+      font-size: $font-xs;
+      color: $color-text-disabled;
+    }
+    .memo-adder {
+      // 添加框与列表留出间距
+      margin-bottom: $spacing-sm;
+    }
+    :deep(.van-cell-group--inset) {
+      margin: 0;
+      border-radius: $radius-lg;
+      overflow: hidden;
+    }
+    .cell-icon {
+      margin-right: 10px;
+      font-size: 18px;
+      align-self: center;
+    }
+    .cell-del {
+      font-size: 18px;
+      align-self: center;
+      padding: 0 4px 0 10px;
+    }
+    // 已完成的备忘：文字置灰 + 删除线，与每日目标视觉一致
+    :deep(.van-cell.is-done .van-cell__title) {
+      color: $color-text-disabled;
+      text-decoration: line-through;
     }
   }
 }

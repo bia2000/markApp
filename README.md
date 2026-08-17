@@ -28,15 +28,13 @@ markApp/
 │
 ├── h5/                           # H5 业务层（@hybrid/h5）
 │   ├── src/
-│   │   ├── api/                  # 后端接口定义
 │   │   ├── bridge/               # JSBridge H5 侧封装（call / 事件总线 / mock 降级）
-│   │   ├── components/           # 公共组件
 │   │   ├── composables/          # 组合式函数
 │   │   │   ├── useApp.ts         # 平台识别、原生就绪握手
 │   │   │   ├── useWidget.ts      # 桌面组件数据同步
 │   │   │   └── useAudioRecorder.ts  # 语音复盘录音（原生桥 / 浏览器 MediaRecorder 双适配）
 │   │   ├── router/               # 路由 + 双栈协同跳转（navigate.ts / index.ts）
-│   │   ├── stores/               # Pinia：app / user / message / todo / goal / summary
+│   │   ├── stores/               # Pinia：app / todo / goal / summary
 │   │   ├── styles/               # 全局样式（含 dialog.scss 居中兜底）
 │   │   ├── utils/                # 工具：request(http) / idb / toast / dialog
 │   │   ├── views/                # 业务页面（见第三节）
@@ -59,16 +57,10 @@ markApp/
 
 | 页面（views） | 路由 | 说明 |
 |------|------|------|
-| `home` | `/` | 首页入口 |
+| `home` | `/home` | 记事项首页：事项管理、快速打卡、备份导入导出、桌面快捷方式 |
+| `stats` | `/stats` | 数据 / 打卡统计（日历打点、周统计、累计排行） |
 | `summary` | `/summary` | **每日总结**：文字复盘 + 语音复盘（录音走原生桥，回放 + 删除） |
 | `dailyGoal` | `/daily-goal` | 每日目标设定与打卡 |
-| `todo` | （store） | 事项账本，桌面组件与「快速记一笔」共享 |
-| `stats` | `/stats` | 数据 / 打卡统计 |
-| `category` | `/category` | 分类导航 |
-| `message` | `/message` | 消息中心 |
-| `profile` | `/profile` | 个人中心 |
-| `settings` | `/settings` | 设置 |
-| `login` | `/login` | 登录 |
 
 **语音复盘（重点）**：`/summary` 页支持「文字 / 语音」分段切换。语音录音在**真机走原生桥**（`device.audio.start/stop`，原生录 m4a 回传 base64），浏览器 `localhost` 开发环境走 `MediaRecorder` 双适配。音频 base64 存入 **IndexedDB**（`utils/idb.ts`），store 仅保存按日期的小索引（meta 不含 base64），避免 localStorage 5MB 被撑爆。
 

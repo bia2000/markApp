@@ -79,6 +79,9 @@ class AudioPlugin(private val context: Context) : BridgePlugin {
                 return
             }
             val bytes = FileInputStream(file).use { it.readBytes() }
+            // 数据已读入内存，删除临时文件，避免外部目录随录音次数无限堆积
+            file.delete()
+            outputFile = null
             val base64 = Base64.encodeToString(bytes, Base64.DEFAULT)
             val data = JSONObject().apply {
                 put("base64", base64)

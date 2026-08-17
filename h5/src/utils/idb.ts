@@ -24,7 +24,14 @@ function openDB(): Promise<IDBDatabase> {
       }
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      // 失败后重置缓存，否则后续所有调用都拿到同一个 rejected promise，永远无法重试
+      dbPromise = null;
+      reject(req.error);
+    };
+    req.onblocked = () => {
+      dbPromise = null;
+    };
   });
   return dbPromise;
 }

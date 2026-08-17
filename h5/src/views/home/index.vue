@@ -217,7 +217,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import confirm from '@/utils/dialog';
+import confirm, { confirmRemove } from '@/utils/dialog';
 import toast from '@/utils/toast';
 import { useTodoStore, type TodoItem, type TodoRecord } from '@/stores/todo';
 import { formatMD } from '@/utils/date';
@@ -300,18 +300,12 @@ function colorOf(id: string): string {
   return todo.items.find((i) => i.id === id)?.color ?? '#1989fa';
 }
 
-async function onDeleteItem(item: TodoItem): Promise<void> {
-  try {
-    await confirm({
-      title: '删除事项',
-      message: `确定删除「${item.title}」吗？相关记录也会一并删除。`,
-      danger: true
-    });
-    todo.removeItem(item.id);
-    toast.success('已删除');
-  } catch {
-    /* 取消 */
-  }
+function onDeleteItem(item: TodoItem): void {
+  void confirmRemove({
+    title: '删除事项',
+    message: `确定删除「${item.title}」吗？相关记录也会一并删除。`,
+    action: () => todo.removeItem(item.id)
+  });
 }
 
 // ========== 编辑事项：改名称 / 设分数 ==========
@@ -340,14 +334,12 @@ function saveEdit(): void {
   toast.success('已保存');
 }
 
-async function onDeleteRec(rec: TodoRecord): Promise<void> {
-  try {
-    await confirm({ title: '删除记录', message: '确定删除这条记录吗？', danger: true });
-    todo.removeRecord(rec.id);
-    toast.success('已删除');
-  } catch {
-    /* 取消 */
-  }
+function onDeleteRec(rec: TodoRecord): void {
+  void confirmRemove({
+    title: '删除记录',
+    message: '确定删除这条记录吗？',
+    action: () => todo.removeRecord(rec.id)
+  });
 }
 
 // ========== 数据备份：导出 / 导入 ==========
@@ -480,6 +472,8 @@ async function doImport(): Promise<void> {
 </script>
 
 <style lang="scss" scoped>
+@use '@/styles/shared';
+
 .home {
   &__date {
     font-size: $font-xs;
@@ -492,20 +486,6 @@ async function doImport(): Promise<void> {
 
   &__section {
     margin-top: $spacing-lg;
-  }
-  &__section-title {
-    display: flex;
-    align-items: baseline;
-    gap: $spacing-sm;
-    padding: $spacing-sm $spacing-lg;
-    font-size: $font-lg;
-    font-weight: 600;
-    color: $color-text;
-  }
-  &__hint {
-    font-size: $font-xs;
-    font-weight: 400;
-    color: $color-text-secondary;
   }
 
   &__items {
@@ -576,18 +556,6 @@ async function doImport(): Promise<void> {
     color: $color-text-disabled;
     font-size: 14px;
   }
-}
-
-.rec-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: $spacing-sm;
-  align-self: center;
-}
-
-.del-btn {
-  height: 100%;
 }
 
 // 编辑事项弹层

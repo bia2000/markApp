@@ -15,6 +15,7 @@
  *   }
  */
 import { showConfirmDialog } from 'vant';
+import toast from '@/utils/toast';
 
 export interface ConfirmOptions {
   /** 标题，省略则不显示标题栏 */
@@ -39,6 +40,32 @@ export function confirm(options: ConfirmOptions): Promise<void> {
     // Dialog 无 danger 主题，用 className 触发 .app-dialog--danger 红色确认按钮
     className: options.danger ? 'app-dialog--danger' : undefined
   }).then(() => undefined);
+}
+
+export interface ConfirmRemoveOptions {
+  title: string;
+  message: string;
+  /** 确认后执行的动作（如 todo.removeRecord(id) 及后续刷新） */
+  action: () => void | Promise<void>;
+  /** 成功提示文案，默认「已删除」；传空字符串则不提示 */
+  successText?: string;
+}
+
+/**
+ * 「确认 → 执行删除 → 成功提示」流水线：全项目 4 个页面 8+ 处删除交互统一走这里。
+ * 返回是否真正执行了删除（用户取消返回 false）。
+ */
+export async function confirmRemove(options: ConfirmRemoveOptions): Promise<boolean> {
+  try {
+    await confirm({ title: options.title, message: options.message, danger: true });
+  } catch {
+    return false; // 用户取消，不操作
+  }
+  await options.action();
+  if (options.successText !== '') {
+    toast.success(options.successText ?? '已删除');
+  }
+  return true;
 }
 
 export default confirm;

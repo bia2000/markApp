@@ -3,14 +3,36 @@ import WebKit
 /// JSBridge 核心：管理原生能力插件，处理 H5 invoke 调用并回传 callback
 final class JSBridgeContentController: WKUserContentController, WKScriptMessageHandler {
 
+    /// 全局事件通知名（EventBus.dispatch 发出，由各 WebView 的桥实例转发给 H5）
+    static let bridgeEventNotification = Notification.Name("BridgeEvent")
+
     private var plugins: [String: BridgePlugin] = [:]
     private let messageName = "NativeBridgeInvoke"
     /// 持有所属 WebView，用于把 callback / event 真正执行回 H5（混合架构下每个 Tab 一个 WebView）
     private weak var webView: WKWebView?
+    private var eventObserver: NSObjectProtocol?
 
     override init() {
         super.init()
         add(self, name: messageName)
+        // 订阅全局事件（app.foreground / app.background 等），转发到本 WebView 的 H5。
+        // 此前该通知无任何 observer，原生前后台事件永远到不了 H5。
+        eventObserver = NotificationCenter.default.addObserver(
+            forName: Self.bridgeEventNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let info = note.userInfo,
+                  let event = info["event"] as? String else { return }
+            self.dispatchEvent(event: event, data: info["data"])
+        }
+    }
+
+    deinit {
+        if let eventObserver {
+            NotificationCenter.default.removeObserver(eventObserver)
+        }
     }
 
     /// 由 HybridWebViewController 在创建 WKWebView 后挂载，使回传链路可用

@@ -1,5 +1,6 @@
 import WebKit
 import Foundation
+import SSZipArchive
 
 /// 离线包管理：版本比对、本地解压、WebView 请求拦截
 final class OfflinePackageHandler: NSObject, WKNavigationDelegate {
@@ -60,8 +61,21 @@ final class OfflinePackageHandler: NSObject, WKNavigationDelegate {
         let targetDir = rootDir.appendingPathComponent(version, isDirectory: true)
         try? FileManager.default.removeItem(at: targetDir)
         try? FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
-        // 实际项目使用 SSZipPath 解压
-        // SSZipArchive.unzipFile(atPath: tempUrl.path, toDestination: targetDir.path)
+        // 真正解压（SSZipArchive 自带 Zip Slip 路径穿越防护）
+        guard SSZipArchive.unzipFile(atPath: tempUrl.path, toDestination: targetDir.path) else {
+            // 解压失败：清理坏包目录，不更新版本号，下次启动可重试
+            try? FileManager.default.removeItem(at: targetDir)
+            return
+        }
+        // 把 zip 内的 manifest 持久化到根目录：loadLocalVersion 依赖它恢复版本号
+        let extractedManifest = targetDir.appendingPathComponent("manifest.json")
+        guard FileManager.default.fileExists(atPath: extractedManifest.path) else {
+            try? FileManager.default.removeItem(at: targetDir)
+            return
+        }
+        let rootManifest = rootDir.appendingPathComponent("manifest.json")
+        try? FileManager.default.removeItem(at: rootManifest)
+        try? FileManager.default.copyItem(at: extractedManifest, to: rootManifest)
         currentVersion = version
     }
 

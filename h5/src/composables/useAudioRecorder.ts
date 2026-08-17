@@ -16,6 +16,7 @@
 import { ref, onUnmounted } from 'vue';
 import { call } from '@/bridge';
 import { usePlatform } from '@/composables/useApp';
+import { uid } from '@/utils/uid';
 
 export interface AudioClip {
   id: string;
@@ -25,10 +26,6 @@ export interface AudioClip {
   mime: string;
   /** base64（不含 data: 前缀） */
   base64: string;
-}
-
-function genId(): string {
-  return `aud_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -100,13 +97,25 @@ export function useAudioRecorder() {
         return;
       }
       const mr = mediaRecorder;
+      const cleanup = (): void => {
+        mediaStream?.getTracks().forEach((t) => t.stop());
+        mediaStream = undefined;
+      };
+      mr.onerror = () => {
+        cleanup();
+        reject(new Error('录音失败'));
+      };
       mr.onstop = () => {
         const blob = new Blob(chunks, { type: mr.mimeType });
-        void blobToBase64(blob).then((base64) => {
-          mediaStream?.getTracks().forEach((t) => t.stop());
-          mediaStream = undefined;
-          resolve({ id: genId(), duration, mime: mr.mimeType, base64 });
-        });
+        blobToBase64(blob)
+          .then((base64) => {
+            cleanup();
+            resolve({ id: uid('aud'), duration, mime: mr.mimeType, base64 });
+          })
+          .catch((err) => {
+            cleanup();
+            reject(err);
+          });
       };
       mr.stop();
     });
@@ -126,7 +135,7 @@ export function useAudioRecorder() {
     const res = await call('device.audio.stop');
     mediaStream = undefined;
     return {
-      id: genId(),
+      id: uid('aud'),
       duration: res.duration || duration,
       mime: formatToMime(res.format),
       base64: res.base64

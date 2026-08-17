@@ -9,6 +9,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { storage } from '@/utils/storage';
 import { todayStr, formatCN } from '@/utils/date';
+import { uid } from '@/utils/uid';
 
 export interface Goal {
   id: string;
@@ -19,10 +20,6 @@ export interface Goal {
 }
 
 const GOALS_KEY = 'notepad:goals';
-
-function uid(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
 
 export const useGoalStore = defineStore('goal', () => {
   const goals = ref<Goal[]>(storage.getJSON<Goal[]>(GOALS_KEY, []));

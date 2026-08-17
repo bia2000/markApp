@@ -50,7 +50,7 @@
               累计排行 <span class="home__hint">全部事项</span>
             </div>
             <van-empty v-if="!todo.cumulative.length" description="暂无数据" />
-            <div v-for="(item, idx) in todo.cumulative" :key="item.itemId" class="rank-row">
+            <div v-for="(item, idx) in todo.cumulative" :key="item.id" class="rank-row">
               <span class="rank-no" :class="{ 'rank-no--top': idx < 3 }">{{ idx + 1 }}</span>
               <span class="rank-dot" :style="{ background: item.color }" />
               <span class="rank-name">{{ item.title }}</span>
@@ -191,10 +191,11 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import type { CalendarInstance } from 'vant';
 import { useTodoStore, type TodoRecord } from '@/stores/todo';
 import { dateToStr, mondayOf, todayStr } from '@/utils/date';
-import confirm from '@/utils/dialog';
-import toast from '@/utils/toast';
+import { confirmRemove } from '@/utils/dialog';
+import { makeCalendarFormatter } from '@/utils/calendarMark';
 
 defineOptions({ name: 'stats' });
 
@@ -212,7 +213,7 @@ const minDate = (() => {
 // ===== 月份筛选导航 =====
 // 默认当前状态不变：日历渲染范围(min~max)与原行为一致，这里仅叠加月份跳转。
 // viewMonth 仅供导航条显示，默认指向「当前月」；日历初始渲染位置保持不变。
-const calendarRef = ref<any>(null);
+const calendarRef = ref<CalendarInstance | null>(null);
 const viewMonth = ref(new Date(maxDate.getFullYear(), maxDate.getMonth(), 1));
 const showMonthPicker = ref(false);
 const pickerYear = ref(maxDate.getFullYear());
@@ -360,27 +361,23 @@ function onSelect(date: Date): void {
   showDay.value = true;
 }
 
-async function onDeleteRec(rec: TodoRecord): Promise<void> {
-  try {
-    await confirm({ title: '删除记录', message: '确定删除这条记录吗？', danger: true });
-    todo.removeRecord(rec.id);
-    calKey.value += 1;
-    toast.success('已删除');
-  } catch {
-    /* 取消 */
-  }
+function onDeleteRec(rec: TodoRecord): void {
+  void confirmRemove({
+    title: '删除记录',
+    message: '确定删除这条记录吗？',
+    action: () => {
+      todo.removeRecord(rec.id);
+      calKey.value += 1;
+    }
+  });
 }
 
-// 有记录的日期打点，下方标注当天得分
-function formatter(day: any): any {
-  const ds = dateToStr(day.date);
-  if (todo.recordedDates.has(ds)) {
-    day.className = 'cal-has-record';
-    const score = todo.recordsByDate(ds).reduce((s, r) => s + (r.score ?? 1), 0);
-    day.bottomInfo = `${score}分`;
-  }
-  return day;
-}
+// 有记录的日期打点（蓝点），下方标注当天得分
+const formatter = makeCalendarFormatter({
+  hasRecord: (ds) => todo.recordedDates.has(ds),
+  scoreOf: (ds) => todo.recordsByDate(ds).reduce((s, r) => s + (r.score ?? 1), 0),
+  recordClassName: 'cal-has-record'
+});
 
 function colorOf(id: string): string {
   return todo.items.find((i) => i.id === id)?.color ?? '#1989fa';
@@ -388,6 +385,8 @@ function colorOf(id: string): string {
 </script>
 
 <style lang="scss" scoped>
+@use '@/styles/shared';
+
 .stats {
   &__cal-card {
     margin: $spacing-md $spacing-lg;
@@ -451,29 +450,6 @@ function colorOf(id: string): string {
   &__weeks {
     margin-top: $spacing-md;
   }
-}
-
-.home__section-title {
-  display: flex;
-  align-items: baseline;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-lg;
-  font-size: $font-lg;
-  font-weight: 600;
-  color: $color-text;
-}
-.home__hint {
-  font-size: $font-xs;
-  font-weight: 400;
-  color: $color-text-secondary;
-}
-
-.rec-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: $spacing-sm;
-  align-self: center;
 }
 
 // 当日记录弹窗
@@ -586,10 +562,6 @@ function colorOf(id: string): string {
   &__count {
     color: $color-primary;
   }
-}
-
-.del-btn {
-  height: 100%;
 }
 
 // 月份选择弹层
